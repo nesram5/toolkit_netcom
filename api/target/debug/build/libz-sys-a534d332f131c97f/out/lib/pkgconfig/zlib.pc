@@ -1,4 +1,4 @@
-prefix=C:\Toolkit_Netcom\toolkit_netcom\deploying\api\target\debug\build\libz-sys-a534d332f131c97f\out
+prefix=C:\Toolkit_Netcom\toolkit_netcom\api\target\debug\build\libz-sys-a534d332f131c97f\out
 exec_prefix=@exec_prefix@
 libdir=${prefix}/lib
 sharedlibdir=@sharedlibdir@

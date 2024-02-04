@@ -15,8 +15,7 @@ def read_txt_to_string(file_path):
 
 def read_txt_radius(file_path):
     with open(file_path, 'r') as file:
-        data = file.read().replace('\n', ' ')
-        data = file.read().replace('\"', ' ')
+        data = file.read()
     return data
 def command_list(list_ip, username, password):
     
@@ -55,7 +54,7 @@ def command_list(list_ip, username, password):
             commands.append(cmd3)
 
             if i < j: 
-                cmd4 = " powershell.exe wt.exe --window last sp --title {title} -H -c {api} '{arg8}' '{arg9}' '{arg10}' '{arg11}' '{user}' '{passw}' \n".format(api = api, user = username, passw = password, arg8 = list_ip[i], arg9 = list_ip[i+1], arg10 = list_ip[i+2], arg11 = list_ip[i+3], title = titletab[n])
+                cmd4 = "powershell.exe wt.exe --window last sp --title {title} -H -c {api} '{arg8}' '{arg9}' '{arg10}' '{arg11}' '{user}' '{passw}' \n".format(api = api, user = username, passw = password, arg8 = list_ip[i], arg9 = list_ip[i+1], arg10 = list_ip[i+2], arg11 = list_ip[i+3], title = titletab[n])
                 i = i + 4
                 commands.append(cmd4)
             else:

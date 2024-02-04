@@ -11,7 +11,7 @@ routes = "{current_dir}\\routes.txt".format(current_dir = current_dir)
 ips = "{current_dir}\\ips.txt".format(current_dir = current_dir)
 latency_avg = 0
 ttl_avg = 0
-hostname = '10.1.32.1'
+hostname = '10.1.36.1'
 net_connect = None
 port = '22'
 username = 'nramirez'
@@ -20,22 +20,23 @@ destination_ip = '8.8.8.8'
 source_ip = '45.182.141.0'
 shell = None
 ip_segment_node = {
+    
+    "castillito":['52','10.1.52.1'],
+    "castellana" : ['60', '10.1.60.1'],
     "copei" : ['32', '10.1.32.1'],
     "copei-a" : ['52', '10.1.32.1'],
-    "mirador" : ['44', '10.1.44.1'],
-    "parral" : ['36', '10.1.36.1'],
     "colina" : ['40', '10.1.40.1'],
-    "castellana" : ['60', '10.1.60.1'],
-    "esmeralda" : ['56', '10.1.56.1'],
-    "san_andres" : ['10.32', '10.10.32.1'],
-    "parques" : ['10.48','10.10.48.1'],
-    "torre_ejecutiva":['96','10.1.96.1'],
-    "isla_larga": ['8','10.1.8.1'],
-    "paseo" : ['10.36','10.10.36.1'],
+    "esmeralda" : ['56', '10.1.56.1'],    
     "flor_amarillo" : ['10.40', '10.10.40.1'],
     "guacara" : ['10.44','10.10.44.1'],
+    "isla_larga": ['8','10.1.8.1'],   
+    "mirador" : ['44', '10.1.44.1'], 
+    "paseo" : ['10.36','10.10.36.1'],
+    "parques" : ['10.48','10.10.48.1'],
+    "parral" : ['36', '10.1.36.1'],
+    "san_andres" : ['10.32', '10.10.32.1'],
+    "torre_ejecutiva":['96','10.1.96.1'],
     "xian":['48','10.1.48.1'],
-    "castillito":['52','10.1.52.1']
     }
 
 def append_list_to_txt(file_path, my_list):
@@ -48,8 +49,9 @@ def command_mk_find_ip_management(segment):
     command = []
     i = 0
 
-    if '·' in segment:
-        segment = int(segment)
+    if '.' in segment:
+        result = segment.split(".")
+        segment = int(result[1])
         while i < 4:
             segment = segment + i
             command.append('ip route print terse without-paging where gateway~"10.10.{}"'.format(segment))
@@ -82,6 +84,7 @@ def exec_commands_in_mk(commands):
     
     with open(ips, 'r') as file:
         ips_list = file.readlines()
+        file.close()
     return ips_list
 
 def save_list_to_txt(file_path, my_list):
@@ -334,7 +337,9 @@ def get_number_before_dot(s):
 
 def find_management_ip(node_segment_initial, route_list):#return result
 
-    if '·' in node_segment_initial:
+    if '.' in node_segment_initial:
+        separeted = node_segment_initial.split(".")
+        node_segment_initial = separeted[1]
         result = get_number_before_dot(node_segment_initial)
         node_segment_initial = int(result)
         a = 10
@@ -379,9 +384,9 @@ def print_ip_and_segment():
 def main():
     global ips
     connection_mikrotik_netmiko()
-    commands = command_mk_find_ip_management('32')
+    commands = command_mk_find_ip_management('52')
     route_list = exec_commands_in_mk(commands)
-    managment_ip = find_management_ip('32',route_list)
+    managment_ip = find_management_ip('52',route_list)
     save_list_to_txt(ips, managment_ip)
 
     route_list = connection_octus_netmiko()
