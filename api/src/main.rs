@@ -30,9 +30,8 @@ fn ssh_continuous_output(
     if !session.authenticated() {
         return Err("Failed to authenticate".into());
     }
-
-    let mut latency: Vec<Vec<f32>> = Vec::new();
-    let mut ttl: Vec<Vec<i32>> = Vec::new();
+    let mut latency:Vec<f32> = Vec::new();
+    let mut ttl:Vec<i32> = Vec::new();
     let mut latency_avg: Vec<String> = Vec::new();
     let mut packet_loss: Vec<String> = Vec::new();
 
@@ -55,38 +54,40 @@ fn ssh_continuous_output(
         //print!("{}", str::from_utf8(&buffer)?);
         let (latency_avg_str, latency_result, ttl_result, packet_lost_percentage_string) = process_ssh_terminal(&mut buffer);
 
-              /*println!(
-            "AVG {:?}, Latency {:?}, TTL {:?}, PL {:?}",
-            latency_avg, latency, ttl, packet_lost_percentage
-        );
-        //clear_console();
-        // Clear the buffer
-        */
-        latency.push(latency_result);//f32
-        ttl.push(ttl_result);//i32
+        latency = latency_result.iter().cloned().collect(); 
+        
+        ttl = ttl_result.iter().cloned().collect();
+        
         latency_avg.push(latency_avg_str);//String
         packet_loss.push(packet_lost_percentage_string);//String
        
 
-        let latency_int: Vec<i64> = custom_round(latency.clone());
+        let latency_int: Vec<i64> = latency.iter().map(|&f| f as i64).collect();
 
         let max_value = *latency_int.iter().max().unwrap_or(&0);
 
         let min_value = *latency_int.iter().min().unwrap_or(&0);
         
+        let last_latency_avg = check_last(latency_avg.clone());
+        let last_packet_loss = check_last(packet_loss.clone());
+        let last_latency = check_last_f32(latency.clone());
+        let last_ttl = check_last_i32(ttl.clone());
+        
+
+       
 
         // Move cursor to the bottom of the console (line 50)
         execute!(io::stdout(), cursor::MoveTo(1, BANNER_LINE))?;
         
         // Print a line at the bottom
-        let banner_text = format!("{} \nMax: {} ms Min: {} ms Actual: {:?} ms \nAVG TTL: {:?} Package Lost: {:?} ms AVG: {:?} ms", 
+        let banner_text = format!("{} \nMax: {} ms Min: {} ms Actual: {} ms \nAVG TTL: {} Package Lost: {} ms AVG: {}", 
         title,
         max_value,
         min_value,
-        latency.last().unwrap(),                    
-        ttl.last().unwrap(),
-        packet_loss.last().unwrap(),
-        latency_avg.last().unwrap());
+        last_latency,                    
+        last_ttl,
+        last_packet_loss,
+        last_latency_avg);
 
         print_line(&banner_text, BANNER_LINE)?;
         let buffer_str = str::from_utf8(&buffer).expect("Invalid UTF-8 data");
@@ -96,7 +97,6 @@ fn ssh_continuous_output(
             
             print_line(&buffer_str, line_number)?;
             line_number += 1;
-            //thread::sleep(time::Duration::from_millis(2));
            
             
            
@@ -104,18 +104,12 @@ fn ssh_continuous_output(
        
         else {
             line_number = 0 ;
-            //thread::sleep(time::Duration::from_millis(5));
             clear_lines(PING_RESULTS_START_LINE, PING_RESULTS_END_LINE + 3 )?;
             
         }
-        // Sleep for a while to keep the result visible
-        //thread::sleep(time::Duration::from_secs(1));
-        //clean buffer
-        if buffer.iter().filter(|&&c| c != 0).count() >= 4096 {
-            // Buffer is full, do something
-            // Clear the buffer
-            buffer = [0; 4096];
-        }
+        //Clena buffer
+        buffer = [0; 4096];
+        
         })
     }
 
@@ -123,20 +117,13 @@ fn ssh_continuous_output(
 fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>, String){
     let mut ttl: Vec<i32> = Vec::new();
     let mut latency: Vec<f32> = Vec::new();
-    let avg_rtt = String::new();
-    let packet_loss = String::new();
+    let mut avg_rtt = String::new();
+    let mut packet_loss = String::new();
 
-    // Add 0 value to average
-    /*if latency_avg.is_empty() {
-        latency_avg.push(0.0);
-    }
-    */
     
-    //let mut i = 0;
     let mut reader = BufReader::new(Cursor::new(&mut buffer[..]));
 
-    // Add implementation for escape_ansi function or remove its usage
-
+    
     loop {
         let mut line = String::new();
         if let Ok(bytes_read) = reader.read_line(&mut line) {
@@ -160,12 +147,30 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
             let tokens: Vec<&str> = line.split_whitespace().collect();
 
             // Find the values of packet-loss and avg-rtt
-            let packet_loss_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("packet-loss=")).map(|token| &token[12..]);
-            let avg_rtt_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("avg-rtt=")).map(|token| &token[8..]);
+            //let packet_loss_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("packet-loss=")).map(|token| &token[12..]);
+            //let avg_rtt_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("avg-rtt=")).map(|token| &token[8..]);
         
             // Convert Option<&str> to String
-            let packet_loss = packet_loss_str.map_or_else(|| String::from(""), |s| s.to_string());
-            let avg_rtt = avg_rtt_str.map_or_else(|| String::from(""), |s| s.to_string());
+            
+            let mut avg_rtt_str = None;
+            let mut packet_loss_str = None;
+
+            for entry in tokens {
+                let parts: Vec<&str> = entry.split('=').collect();
+                if parts.len() == 2 {
+                    let key = parts[0];
+                    let value = parts[1];
+
+                    match key {
+                        "avg-rtt" => avg_rtt_str = Some(value),
+                        "packet-loss" => packet_loss_str = Some(value),
+                        _ => {}
+                    }
+                }
+            }
+            
+            packet_loss = packet_loss_str.map_or_else(|| String::from(""), |s| s.to_string());
+            avg_rtt = avg_rtt_str.map_or_else(|| String::from(""), |s| s.to_string());
         
             return (avg_rtt, latency , ttl, packet_loss);
         }
@@ -224,7 +229,7 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
     println!("{}", line);
  }
 
- fn custom_round(latency: Vec<Vec<f32>>) -> Vec<i64> {
+ /*fn custom_round(latency: Vec<Vec<f32>>) -> Vec<i64> {
     latency.into_iter().flat_map(|inner_vec| {
         inner_vec.into_iter().map(|x| {
             if x >= 0.0 {
@@ -234,7 +239,7 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
             }
         })
     }).collect()
-}
+}*/
 
 fn print_line(content: &str, line: u16) -> io::Result<()> {
     execute!(
@@ -265,23 +270,18 @@ fn clear_screen() {
         println!("Clear screen not supported on this platform.");
     }
 }
-fn main() {
-    let args: Vec<String> = env::args().collect();
 
-    // Check if enough arguments are provided
-    if args.len() < 7 {
-        eprintln!("Usage: {} <title> <host> <username> <password> <source_address> <destination_address>", args[0]);
-        std::process::exit(1);
-    }
 
+fn test(){
     // Extract values from arguments
     let port: &str = "22";
-    let title = &args[1];
-    let destination_address = &args[2];
-    let source_address = &args[3];
-    let host = &args[4];
-    let username = &args[5];
-    let password = &args[6];
+    let title = "Proveedor_FIBEX".to_string();
+    let destination_address = "8.8.8.8";
+    let source_address = "38.183.113.0";
+    let host = "10.0.0.6";
+    let username = "nramirez";
+    let password = "N3st0rR4m23*";
+    
     
     
     let command = format!("ping {} src-address={}", destination_address, source_address) ; // Replace with the command you want to execute
@@ -294,5 +294,97 @@ fn main() {
         Ok(_) => println!("SSH connection successful"),
         Err(err) => eprintln!("Error: {}", err),
     }
+
+}
+
+fn check_last( vec_string:Vec<String> ) -> String {
+            
+    let mut last_vec_string:String = "".to_string();
+
+    if let Some(check) = vec_string.last() {
+        if check.is_empty() {
+            if let Some(last_non_zero) = vec_string.iter().rev().find(|&value| !value.is_empty()) {
+                last_vec_string = last_non_zero.to_string();
+            } else {
+                last_vec_string = vec_string.last().unwrap().to_string();
+            }
+        } else {
+            last_vec_string = vec_string.last().unwrap().to_string();
+        }
+    } else {
+        last_vec_string = vec_string.last().unwrap().to_string();
+    }
+    return last_vec_string;
+}
+
+fn check_last_f32(vec_f32: Vec<f32>) -> f32 {
+    let mut last_vec_f32: f32 = 0.0;
+
+    if let Some(&check) = vec_f32.last() {
+        // Check if the last element is not zero
+        if check != 0.0 {
+            last_vec_f32 = check;
+        } else {
+            // Find the last non-zero element in reverse order
+            if let Some(&last_non_zero) = vec_f32.iter().rev().find(|&&value| value != 0.0) {
+                last_vec_f32 = last_non_zero;
+            } else {
+                // If no non-zero element is found, set the last element
+                last_vec_f32 = check;
+            }
+        }
+    }
+
+    last_vec_f32
+}
+
+fn check_last_i32(vec_i32: Vec<i32>) -> i32 {
+    let mut last_vec_i32: i32 = 0;
+
+    if let Some(&check) = vec_i32.last() {
+        // Check if the last element is not zero
+        if check != 0 {
+            last_vec_i32 = check;
+        } else {
+            // Find the last non-zero element in reverse order
+            if let Some(&last_non_zero) = vec_i32.iter().rev().find(|&&value| value != 0) {
+                last_vec_i32 = last_non_zero;
+            } else {
+                // If no non-zero element is found, set the last element
+                last_vec_i32 = check;
+            }
+        }
+    }
+
+    last_vec_i32
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 7 {
+        eprintln!("Usage: {} <title> <host> <username> <password> <source_address> <destination_address>", args[0]);
+        std::process::exit(1);
+    }
+    let port: &str = "22";
+    let title = &args[1];
+    let destination_address = &args[2];
+    let source_address = &args[3];
+    let host = &args[4];
+    let username = &args[5];
+    let password = &args[6];
+    
+    let command = format!("ping {} src-address={}", destination_address, source_address);
+    
+    // Convert host and port to a String
+    let address = format!("{}:{}", host, port);
+
+
+    match ssh_continuous_output(&address, username, password, &command, &title) {
+        Ok(_) => println!("SSH connection successful"),
+        Err(err) => eprintln!("Error: {}", err),
+    }
     let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
+    
+
 }
