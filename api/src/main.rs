@@ -1,10 +1,9 @@
-use std::net::TcpStream;
 use std::env;
+use std::net::TcpStream;
 use std::io::{self, BufRead, Cursor, BufReader, Read};
 use ssh2::Session;
 use std::process::Command;
 use std::str;
-//use std::{thread, time};
 use crossterm::{execute, cursor, terminal};
 
 const BANNER_LINE: u16 = 20;
@@ -32,15 +31,17 @@ fn ssh_continuous_output(
     }
     let mut latency:Vec<f32> = Vec::new();
     let mut ttl:Vec<i32> = Vec::new();
-    let mut latency_avg: Vec<String> = Vec::new();
-    let mut packet_loss: Vec<String> = Vec::new();
-
-    // Open a channel and execute the command0480
+    let mut latency_average:f32 = 0.0;
+    let mut packet_loss:f32 = 0.0;
+    let mut min_value:f32 = 0.0;
+    let mut max_value:f32 = 0.0;
+    let mut ttl_average:i32 = 0;
+        // Open a channel and execute the command0480
     let mut channel = session.channel_session()?;
     channel.exec(command)?;
-    let mut buffer = [0; 4096];
+    let mut buffer = [0; 512];
     let mut line_number = 1;
-    
+    let mut iteration = 0;
     clear_screen();
 
     Ok(loop {
@@ -52,75 +53,70 @@ fn ssh_continuous_output(
         
         // Process the continuous output
         //print!("{}", str::from_utf8(&buffer)?);
-        let (latency_avg_str, latency_result, ttl_result, packet_lost_percentage_string) = process_ssh_terminal(&mut buffer);
+        let (latency_result, ttl_result) = process_ssh_terminal(&mut buffer);
 
-        latency = latency_result.iter().cloned().collect(); 
+        latency.extend(latency_result);
         
-        ttl = ttl_result.iter().cloned().collect();
+        ttl.extend(ttl_result);
         
-        latency_avg.push(latency_avg_str);//String
-        packet_loss.push(packet_lost_percentage_string);//String
-       
+          
+        if iteration > 4 {
+            (min_value , max_value) = find_min_max(&latency);
+            
+            packet_loss = calculate_packet_loss(&latency);
 
-        let latency_int: Vec<i64> = latency.iter().map(|&f| f as i64).collect();
+            latency_average = calculate_average_latency(&latency);
 
-        let max_value = *latency_int.iter().max().unwrap_or(&0);
+            ttl_average = calculate_average_ttl(&ttl);
 
-        let min_value = *latency_int.iter().min().unwrap_or(&0);
+            iteration = 0;
+        }
         
-        let last_latency_avg = check_last(latency_avg.clone());
-        let last_packet_loss = check_last(packet_loss.clone());
-        let last_latency = check_last_f32(latency.clone());
-        let last_ttl = check_last_i32(ttl.clone());
         
-
-       
-
         // Move cursor to the bottom of the console (line 50)
         execute!(io::stdout(), cursor::MoveTo(1, BANNER_LINE))?;
         
         // Print a line at the bottom
-        let banner_text = format!("{} \nMax: {} ms Min: {} ms Actual: {} ms \nAVG TTL: {} Package Lost: {} ms AVG: {}", 
+        let banner_text = format!("\t{} \nMax: {} ms Min: {} ms Actual: {:?} ms \nAVG TTL: {} Package Lost: {:.2}% AVG Latency: {:.3} ms", 
         title,
         max_value,
         min_value,
-        last_latency,                    
-        last_ttl,
-        last_packet_loss,
-        last_latency_avg);
+        latency.last().unwrap_or(&0.0),                    
+        ttl_average,
+        packet_loss,
+        latency_average);
 
         print_line(&banner_text, BANNER_LINE)?;
         let buffer_str = str::from_utf8(&buffer).expect("Invalid UTF-8 data");
         
-
        if line_number < PING_RESULTS_END_LINE {
             
             print_line(&buffer_str, line_number)?;
             line_number += 1;
            
-            
-           
-        }
-       
-        else {
+        } else {
             line_number = 0 ;
             clear_lines(PING_RESULTS_START_LINE, PING_RESULTS_END_LINE + 3 )?;
             
         }
-        //Clena buffer
-        buffer = [0; 4096];
-        
+
+        iteration += 1;
+        //Clean buffer
+        buffer = [0; 512];
+        //Clean latency
+        if latency.len() == 100 {
+            // Pop the last 10 elements from the vector
+            latency.remove(0);
+        }
+
         })
+
     }
 
 
-fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>, String){
+fn process_ssh_terminal(buffer: &mut [u8; 512]) -> (Vec<f32>, Vec<i32>){
     let mut ttl: Vec<i32> = Vec::new();
     let mut latency: Vec<f32> = Vec::new();
-    let mut avg_rtt = String::new();
-    let mut packet_loss = String::new();
-
-    
     let mut reader = BufReader::new(Cursor::new(&mut buffer[..]));
 
     
@@ -133,46 +129,15 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
         } else {
             eprintln!("Error reading from stdout");
             break;
-        }
-        
+        }       
 
         // Header line
         if line.contains("SEQ HOST") {
             continue;
         }
-
         // Averages line
         else if line.contains("avg-rtt=") && line.contains("packet-loss=") {
-
-            let tokens: Vec<&str> = line.split_whitespace().collect();
-
-            // Find the values of packet-loss and avg-rtt
-            //let packet_loss_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("packet-loss=")).map(|token| &token[12..]);
-            //let avg_rtt_str: Option<&str> = tokens.iter().find(|&&token| token.starts_with("avg-rtt=")).map(|token| &token[8..]);
-        
-            // Convert Option<&str> to String
-            
-            let mut avg_rtt_str = None;
-            let mut packet_loss_str = None;
-
-            for entry in tokens {
-                let parts: Vec<&str> = entry.split('=').collect();
-                if parts.len() == 2 {
-                    let key = parts[0];
-                    let value = parts[1];
-
-                    match key {
-                        "avg-rtt" => avg_rtt_str = Some(value),
-                        "packet-loss" => packet_loss_str = Some(value),
-                        _ => {}
-                    }
-                }
-            }
-            
-            packet_loss = packet_loss_str.map_or_else(|| String::from(""), |s| s.to_string());
-            avg_rtt = avg_rtt_str.map_or_else(|| String::from(""), |s| s.to_string());
-        
-            return (avg_rtt, latency , ttl, packet_loss);
+            continue;
         }
         // Ping value line
 
@@ -185,26 +150,28 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
             if line.len() >= 5 {
                 ttl.push(line.split_whitespace().nth(3).unwrap_or("0").parse().unwrap_or(0));
             }
-           
         }
  
         // Handle errors
         else if line.contains("could not...") || line.contains("packet-loss=100%") || line.contains("timeout") {
-            handle_error(&line);
+            latency.push(0.0);
+            println!("{}", line);
+
         }
- 
         // Unknown line
         else {
-            println!("Unknown Line:");
+            //println!("Unknown Line:");
+            latency.push(0.0);
             println!("{}", line);
         }
  
         
         if latency.len() != 0 {
-            return (avg_rtt, latency , ttl, packet_loss);
+            return (latency , ttl);
         }
     }
-    (avg_rtt, latency, ttl, packet_loss)
+    (latency, ttl)
+
 }
  
  fn parse_latency_value(element: &str) -> f32 {
@@ -223,24 +190,6 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (String, Vec<f32>, Vec<i32>,
     }
  }
  
- fn handle_error(line: &str) {
-    println!("Could not socket");
-    println!("#########           ERROR           #######");
-    println!("{}", line);
- }
-
- /*fn custom_round(latency: Vec<Vec<f32>>) -> Vec<i64> {
-    latency.into_iter().flat_map(|inner_vec| {
-        inner_vec.into_iter().map(|x| {
-            if x >= 0.0 {
-                (x + 0.5) as i64
-            } else {
-                (x - 0.5) as i64
-            }
-        })
-    }).collect()
-}*/
-
 fn print_line(content: &str, line: u16) -> io::Result<()> {
     execute!(
         io::stdout(),
@@ -271,25 +220,66 @@ fn clear_screen() {
     }
 }
 
+fn calculate_packet_loss(latencies: &Vec<f32>) -> f32 {
+    // Count the number of latencies equal to or less than the threshold
+    let lost_packets = latencies.iter().filter(|&&latency| latency <= 0.0).count() as f32;
+
+    // Calculate the packet-loss percentage
+    let total_packets = latencies.len() as f32;
+    let packet_loss_percentage = (lost_packets * 100.00) / total_packets;
+
+    packet_loss_percentage
+}
+
+fn calculate_average_latency(latencies: &Vec<f32>) -> f32 {
+    // Check if the vector is not empty
+    if latencies.is_empty() {
+        return 0.0;
+    }
+
+    // Sum up all latency values
+    let sum: f32 = latencies.iter().sum();
+
+    // Calculate the average latency
+    let average_latency = sum / latencies.len() as f32;
+
+    average_latency
+}
+
+fn calculate_average_ttl(values: &Vec<i32>) -> i32 {
+    // Check if the vector is not empty
+    if values.is_empty() {
+        return 0;
+    }
+
+    // Sum up all values
+    let sum: i32 = values.iter().sum();
+
+    // Calculate the average and truncate the decimal part
+    let average = sum / values.len() as i32;
+
+    average
+}
+fn find_min_max(latencies: &Vec<f32>) -> (f32 , f32) {
+       // Find the minimum and maximum values
+    let min_value = *latencies.iter().min_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
+    let max_value = *latencies.iter().max_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
+
+    return (min_value, max_value);
+}
 
 fn test(){
     // Extract values from arguments
     let port: &str = "22";
-    let title = "Proveedor_FIBEX".to_string();
-    let destination_address = "8.8.8.8";
-    let source_address = "38.183.113.0";
-    let host = "10.0.0.6";
+    let title = "TD_Int_Dayco-Parques".to_string();
+    let destination_address = "172.16.0.121";
+    let source_address = "172.16.0.122";
+    let host = "10.10.48.1";
     let username = "nramirez";
-    let password = "N3st0rR4m23*";
-    
-    
-    
+    let password = "N3st0rR4m23*";    
     let command = format!("ping {} src-address={}", destination_address, source_address) ; // Replace with the command you want to execute
-    
     // Convert host and port to a String
     let address = format!("{}:{}", host, port);
-
-
     match ssh_continuous_output(&address, username, password, &command, &title) {
         Ok(_) => println!("SSH connection successful"),
         Err(err) => eprintln!("Error: {}", err),
@@ -297,69 +287,7 @@ fn test(){
 
 }
 
-fn check_last( vec_string:Vec<String> ) -> String {
-            
-    let mut last_vec_string:String = "".to_string();
-
-    if let Some(check) = vec_string.last() {
-        if check.is_empty() {
-            if let Some(last_non_zero) = vec_string.iter().rev().find(|&value| !value.is_empty()) {
-                last_vec_string = last_non_zero.to_string();
-            } else {
-                last_vec_string = vec_string.last().unwrap().to_string();
-            }
-        } else {
-            last_vec_string = vec_string.last().unwrap().to_string();
-        }
-    } else {
-        last_vec_string = vec_string.last().unwrap().to_string();
-    }
-    return last_vec_string;
-}
-
-fn check_last_f32(vec_f32: Vec<f32>) -> f32 {
-    let mut last_vec_f32: f32 = 0.0;
-
-    if let Some(&check) = vec_f32.last() {
-        // Check if the last element is not zero
-        if check != 0.0 {
-            last_vec_f32 = check;
-        } else {
-            // Find the last non-zero element in reverse order
-            if let Some(&last_non_zero) = vec_f32.iter().rev().find(|&&value| value != 0.0) {
-                last_vec_f32 = last_non_zero;
-            } else {
-                // If no non-zero element is found, set the last element
-                last_vec_f32 = check;
-            }
-        }
-    }
-
-    last_vec_f32
-}
-
-fn check_last_i32(vec_i32: Vec<i32>) -> i32 {
-    let mut last_vec_i32: i32 = 0;
-
-    if let Some(&check) = vec_i32.last() {
-        // Check if the last element is not zero
-        if check != 0 {
-            last_vec_i32 = check;
-        } else {
-            // Find the last non-zero element in reverse order
-            if let Some(&last_non_zero) = vec_i32.iter().rev().find(|&&value| value != 0) {
-                last_vec_i32 = last_non_zero;
-            } else {
-                // If no non-zero element is found, set the last element
-                last_vec_i32 = check;
-            }
-        }
-    }
-
-    last_vec_i32
-}
-
-fn main() {
+fn main_1(){
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 7 {
@@ -385,6 +313,10 @@ fn main() {
         Err(err) => eprintln!("Error: {}", err),
     }
     let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
+}
+
+fn main() {
     
+    main_1();
 
 }
