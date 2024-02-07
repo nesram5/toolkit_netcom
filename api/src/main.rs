@@ -6,8 +6,8 @@ use ssh2::{Channel, Session};
 use std::process::Command;
 use std::str;
 use crossterm::{execute, cursor, terminal};
+
 //
-use std::fs::{File, OpenOptions};
 
 const BANNER_LINE: u16 = 20;
 const PING_RESULTS_START_LINE: u16 = 1;
@@ -26,11 +26,7 @@ fn establish_ssh_connection(address: &String,username: &str, password: &str,) ->
     Ok(sess)
 }
 
-fn ssh_continuous_output (
-    mut channel: Channel,
-    title: &String,
-    command: &String
-) -> Result<(), Box<dyn Error>> {
+fn ssh_continuous_output (mut channel: Channel, title: &String, command: &String) -> Result<(), Box<dyn Error>> {
     let mut latency:Vec<f32> = Vec::new();
     let mut ttl:Vec<i32> = Vec::new();
     let mut latency_average:f32 = 0.0;
@@ -45,7 +41,7 @@ fn ssh_continuous_output (
 
     let mut buffer = [0; 4096];
     let mut line_number = 1;
-    let mut iteration = 0;
+    //let mut iteration = 0;
     let mut iteration_clean_screen = 0;
     clear_screen();
 
@@ -66,31 +62,32 @@ fn ssh_continuous_output (
         
         
           
-        if iteration > 4 {
-            (min_value , max_value) = find_min_max(&latency);
+        //if iteration > 4 {
+        (min_value , max_value) = find_min_max(&latency);
+        
+        packet_loss = calculate_packet_loss(&latency);
+
+        latency_average = calculate_average_latency(&latency);
+
+        ttl_average = calculate_average_ttl(&ttl);
+
+        //iteration = 0;
             
-            packet_loss = calculate_packet_loss(&latency);
-
-            latency_average = calculate_average_latency(&latency);
-
-            ttl_average = calculate_average_ttl(&ttl);
-
-            iteration = 0;
-            
-        }
+        //}
         
         
         // Move cursor to the bottom of the console (line 50)
         execute!(io::stdout(), cursor::MoveTo(1, BANNER_LINE))?;
         
         // Print a line at the bottom
-        let banner_text = format!("\t{} \nMax: {} ms Min: {} ms Actual: {:?} ms \nAVG TTL: {} Package Lost: {:.2}% AVG Latency: {:.3} ms", 
+        let banner_text = format!("\t\t{} \nAVG TTL: {} Max: {} ms Min: {} ms Actual: {:?} ms \n(Package Lost: {:.2}% of {:?}) AVG Latency: {:.3} ms", 
         title,
+        ttl_average,
         max_value,
         min_value,
-        latency.last().unwrap_or(&0.0),                    
-        ttl_average,
+        latency.last().unwrap_or(&0.0),  
         packet_loss,
+        latency.len(),
         latency_average);
 
         print_line(&banner_text, BANNER_LINE)?;
@@ -109,19 +106,18 @@ fn ssh_continuous_output (
         if iteration_clean_screen == 40{
             clear_screen();
         }
-        iteration += 1;
+        //iteration += 1;
         iteration_clean_screen += 1; 
         //Clean buffer
         buffer = [0; 4096];
         //Clean latency
-        if latency.len() == 20 {
+        if latency.len() == 100 {
             // Pop the last 10 elements from the vector
             latency.remove(0);
         }
 
         })
-    }
-
+}
 
 fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<f32>, Vec<i32>){
     let mut ttl: Vec<i32> = Vec::new();
@@ -163,14 +159,14 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<f32>, Vec<i32>){
  
         // Handle errors
         else if line.contains("could not...") || line.contains("packet-loss=100%") || line.contains("timeout") {
-            latency.push(99.0);
+            latency.push(9999.0);
             println!("{}", line);
 
         }
         // Unknown line
         else {
             //println!("Unknown Line:");
-            latency.push(99.0);
+            latency.push(9999.0);
             println!("{}", line);
         }
  
@@ -232,7 +228,7 @@ fn clear_screen() {
 
 fn calculate_packet_loss(latencies: &Vec<f32>) -> f32 {
     // Count the number of latencies equal to or less than the threshold
-    let lost_packets = latencies.iter().filter(|&&latency| latency == 99.0).count() as f32;
+    let lost_packets = latencies.iter().filter(|&&latency| latency == 9999.0).count() as f32;
 
     // Calculate the packet-loss percentage
     let total_packets = latencies.len() as f32;
@@ -242,16 +238,24 @@ fn calculate_packet_loss(latencies: &Vec<f32>) -> f32 {
 }
 
 fn calculate_average_latency(latencies: &Vec<f32>) -> f32 {
-    // Check if the vector is not empty
+    // Check if the vector is empty
     if latencies.is_empty() {
         return 0.0;
     }
 
+    // Check if there are values equal to 9999.0 and replace them with 0.0
+    let mut cleaned_latencies = latencies.clone();
+    for latency in &mut cleaned_latencies {
+        if *latency == 9999.0 {
+            *latency = 0.0;
+        }
+    }
+
     // Sum up all latency values
-    let sum: f32 = latencies.iter().sum();
+    let sum: f32 = cleaned_latencies.iter().sum();
 
     // Calculate the average latency
-    let average_latency = sum / latencies.len() as f32;
+    let average_latency = sum / cleaned_latencies.len() as f32;
 
     average_latency
 }
@@ -270,124 +274,21 @@ fn calculate_average_ttl(values: &Vec<i32>) -> i32 {
 
     average
 }
+
 fn find_min_max(latencies: &Vec<f32>) -> (f32 , f32) {
+
+     // Check if there are values equal to 9999.0 and replace them with 0.0
+     let mut cleaned_latencies = latencies.clone();
+     for latency in &mut cleaned_latencies {
+         if *latency == 9999.0 {
+             *latency = 0.0;
+         }
+     }
        // Find the minimum and maximum values
-    let min_value = *latencies.iter().min_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
-    let max_value = *latencies.iter().max_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
+    let min_value = *cleaned_latencies.iter().min_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
+    let max_value = *cleaned_latencies.iter().max_by(|&a, &b| a.partial_cmp(b).unwrap()).unwrap();
 
     return (min_value, max_value);
-}
-fn ssh_ask_and_receive_output(mut channel: Channel , command: String) -> io::Result<()> {
-    //let command_1 = "terminal length 0".to_string();d
-
-    //let _channel: Result<(), ssh2::Error> = channel.exec(&command_1);
-    
-     let _channel: Result<(), ssh2::Error> = channel.exec(&command);
-    
-    // Read the output in chunks
-    let mut buffer = Vec::new();
-    let mut chunk = [0; 4096]; // Adjust the chunk size as needed
-    let mut route_list: Vec<String> = Vec::new();
-    
-    loop {
-        match channel.read(&mut chunk) {
-            Ok(bytes_read) if bytes_read > 0 => {
-                buffer.extend_from_slice(&chunk[..bytes_read]);
-
-                // Check for your custom delimiter or process the data accordingly
-                if let Some(delimiter_position) = buffer.iter().position(|&c| c == b'\n') {
-                    // Process the data up to the delimiter (in this case, newline)
-                    let output: Result<&str, str::Utf8Error> = str::from_utf8(&buffer[..delimiter_position]);
-                    route_list.push( format!("\n{:?}", output));
-
-
-                    println!("Partial output:\n{:?}", output);
-
-                    // Remove processed data from the buffer
-                    buffer.drain(..delimiter_position + 1);
-                }
-            }
-            Ok(_) => break,  // End of data
-            Err(err) => return Err(err), // Handle errors
-        }
-    }
-
-    let remaining_output = str::from_utf8(&buffer);
-    println!("Remaining output:\n{:?}", remaining_output);
-    let unique_gateways: Vec<String> = route_list
-        .iter()
-        .flat_map(|entry| entry.split("gateway=").nth(1))
-        .flat_map(|gateway| gateway.split_whitespace().next())
-        .filter(|&gateway| !gateway.is_empty()) // Filter out empty strings
-        .map(String::from)
-        .collect();
-
-    let _save_to_txt_file = save_to_txt_file(&unique_gateways, "gateway.txt");
-
-
-    Ok(())
-}
-
-fn save_to_txt_file(data: &[String], filename: &str) -> io::Result<()> {
-    // Check if the file exists
-    let file_exists = std::path::Path::new(filename).exists();
-
-    // Open the file in append mode or create it if it doesn't exist
-    let mut file = if file_exists {
-        OpenOptions::new().write(true).append(true).open(filename)?
-    } else {
-        File::create(filename)?
-    };
-
-    // Iterate through the data and write each element to the file
-    for line in data {
-        writeln!(file, "{}", line)?;
-    }
-
-    if file_exists {
-        println!("Data appended to {}", filename);
-    } else {
-        println!("Data written to a new file: {}", filename);
-    }
-
-    Ok(())
-}
-fn test(command: String)-> std::io::Error {
-    // Extract values from arguments
-    let port: &str = "22";
-    let title = "Proveedor_Digitel_Aragua".to_string();
-    let destination_address = "1.1.1.1";
-    let source_address = "45.182.141.83";
-    let host = "10.1.32.1";
-    let username = "nramirez";
-    let password = "N3st0rR4m23*";    
-    let segment = "32";
-    //let command = format!("ping {} src-address={}", destination_address, source_address) ; 
-    //Mikrotik
-    //let command = format!("ip route print terse without-paging where gateway~\"10.1.{}\"", segment);
-    
-        
-    
-    //Octnus
-    //let command = "sh ip route | include 192.168.*".to_string();
-    // Replace with the command you want to execute
-    // Convert host and port to a String
-    let address = format!("{}:{}", host, port);
-    let session = establish_ssh_connection(&address, username, password)
-        .map_err(|err| {
-            // Wrap the error in a custom std::io::Error
-            io::Error::new(io::ErrorKind::Other, format!("SSH connection error: {}", err))
-        });
-
-    let mut channel: Result<Channel, ssh2::Error> = session.expect("REASON").channel_session();
-    //let _ssh_continuos_output = ssh_continuous_output(channel.expect("REASON"),  &title, &command);
-            
-    let _line  = ssh_ask_and_receive_output(channel.expect("REASON"), command);
-   
-    
-    let custom_error_message = "Custom error message";
-    io::Error::new(io::ErrorKind::Other, custom_error_message)
-
 }
 
 fn main_1() ->  std::io::Error {
@@ -419,22 +320,14 @@ fn main_1() ->  std::io::Error {
 
     let channel: Result<Channel, ssh2::Error> = session.expect("REASON").channel_session();
     let _ssh_continuos_output = ssh_continuous_output(channel.expect("REASON"),  &title, &command);
+    let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
     
     let custom_error_message = "Custom error message";
     io::Error::new(io::ErrorKind::Other, custom_error_message)
-    //pausa
-    //let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
+    
+    
 }
 
 fn main() {
-    let commands: [String; 4] =["ip route print terse without-paging where gateway~\"10.1.32\"\r\n".to_string(), 
-        "ip route print terse without-paging where gateway~\"10.1.33\"\r\n" .to_string(),
-        "ip route print terse without-paging where gateway~\"10.1.34\"\r\n".to_string(),
-        "ip route print terse without-paging where gateway~\"10.1.35\"\r\n".to_string()];
-
-    for command in commands {
-        test(command);
-    }
-   
-
+    main_1();
 }

@@ -360,7 +360,8 @@ def find_management_ip(node_segment_initial, route_list):#return result
     
 
     complete_ips = {f"10.{a}.{i}.{j}" for i in i_range for j in j_range}
-   
+    file_dir = "{current_dir}\\complete_list.txt".format(current_dir = current_dir)
+    save_list_to_txt(file_dir, complete_ips)
 
     # Identify the missing IPs
     missing_ips = set(map(str,complete_ips)) - set(map(str, unique_gateways))
