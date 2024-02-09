@@ -1,0 +1,17 @@
+###########################################################################
+# libssh2 installation details
+###########################################################################
+
+prefix=C:\Toolkit_Netcom\toolkit_netcom\api\target\release\build\libssh2-sys-199a2ab6e5c8439a\out
+exec_prefix=
+libdir=C:\Toolkit_Netcom\toolkit_netcom\api\target\release\build\libssh2-sys-199a2ab6e5c8439a\out\lib
+includedir=C:\Toolkit_Netcom\toolkit_netcom\api\target\release\build\libssh2-sys-199a2ab6e5c8439a\out\include
+
+Name: libssh2
+URL: https://www.libssh2.org/
+Description: Library for SSH-based communication
+Version: 1.10.1_DEV
+Requires.private: 
+Libs: -L${libdir} -lssh2 
+Libs.private: 
+Cflags: -I${includedir}

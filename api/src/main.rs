@@ -13,12 +13,13 @@ const BANNER_LINE: u16 = 20;
 const PING_RESULTS_START_LINE: u16 = 1;
 const PING_RESULTS_END_LINE: u16 = 15;
 
-fn establish_ssh_connection(address: &String,username: &str, password: &str,) -> Result<Session, Box<dyn std::error::Error>> {
+fn establish_ssh_connection(address: &String,username: &str, password: &str) -> Result<Session, Box<dyn std::error::Error>> {
     let _tcp = TcpStream::connect(address)?;
     let mut sess = Session::new()?;
     sess.set_tcp_stream(_tcp);
     sess.handshake()?;
     // Password-based authentication
+    sess.host_key();
     sess.userauth_password(username, password)?;
     if !sess.authenticated() {
         return Err("Authentication failed".into());
@@ -29,11 +30,11 @@ fn establish_ssh_connection(address: &String,username: &str, password: &str,) ->
 fn ssh_continuous_output (mut channel: Channel, title: &String, command: &String) -> Result<(), Box<dyn Error>> {
     let mut latency:Vec<f32> = Vec::new();
     let mut ttl:Vec<i32> = Vec::new();
-    let mut latency_average:f32 = 0.0;
-    let mut packet_loss:f32 = 0.0;
-    let mut min_value:f32 = 0.0;
-    let mut max_value:f32 = 0.0;
-    let mut ttl_average:i32 = 0;
+    let mut _latency_average:f32 = 0.0;
+    let mut _packet_loss:f32 = 0.0;
+    let mut _min_value:f32 = 0.0;
+    let mut _max_value:f32 = 0.0;
+    let mut _ttl_average:i32 = 0;
         // Open a channel and execute the command0480
 
     let _channel: Result<(), ssh2::Error> = channel.exec(command);    
@@ -63,13 +64,13 @@ fn ssh_continuous_output (mut channel: Channel, title: &String, command: &String
         
           
         //if iteration > 4 {
-        (min_value , max_value) = find_min_max(&latency);
+        (_min_value , _max_value) = find_min_max(&latency);
         
-        packet_loss = calculate_packet_loss(&latency);
+        _packet_loss = calculate_packet_loss(&latency);
 
-        latency_average = calculate_average_latency(&latency);
+        _latency_average = calculate_average_latency(&latency);
 
-        ttl_average = calculate_average_ttl(&ttl);
+        _ttl_average = calculate_average_ttl(&ttl);
 
         //iteration = 0;
             
@@ -82,13 +83,13 @@ fn ssh_continuous_output (mut channel: Channel, title: &String, command: &String
         // Print a line at the bottom
         let banner_text = format!("\t\t{} \nAVG TTL: {} Max: {} ms Min: {} ms Actual: {:?} ms \n(Package Lost: {:.2}% of {:?}) AVG Latency: {:.3} ms", 
         title,
-        ttl_average,
-        max_value,
-        min_value,
+        _ttl_average,
+        _max_value,
+        _min_value,
         latency.last().unwrap_or(&0.0),  
-        packet_loss,
+        _packet_loss,
         latency.len(),
-        latency_average);
+        _latency_average);
 
         print_line(&banner_text, BANNER_LINE)?;
         let buffer_str = str::from_utf8(&buffer).expect("Invalid UTF-8 data");
@@ -291,7 +292,7 @@ fn find_min_max(latencies: &Vec<f32>) -> (f32 , f32) {
     return (min_value, max_value);
 }
 
-fn main_1() ->  std::io::Error {
+fn start() ->  std::io::Error {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 7 {
@@ -329,5 +330,5 @@ fn main_1() ->  std::io::Error {
 }
 
 fn main() {
-    main_1();
+    start();
 }

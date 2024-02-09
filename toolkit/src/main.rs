@@ -56,7 +56,22 @@ fn clean_txt_file(filename: &str) -> io::Result<()>{
 fn save_to_txt_file(data: HashSet<String>, filename: &str) -> io::Result<()> {
 
     let mut file = OpenOptions::new().write(true).append(true).create(true).open(filename)?;
-    
+   
+
+    // Iterate through the data and write each element to the file
+    for line in data {
+        writeln!(file, "{}", line)?;
+    }
+
+
+    Ok(())
+}
+
+fn save_vec_to_txt_file(data: Vec<String>, filename: &str) -> io::Result<()> {
+
+    let mut file = OpenOptions::new().write(true).append(true).create(true).open(filename)?;
+   
+
     // Iterate through the data and write each element to the file
     for line in data {
         writeln!(file, "{}", line)?;
@@ -124,15 +139,31 @@ fn send_ssh_command_save_in_txt(mut channel: Channel , command: &String, looking
         .map(String::from)
         .collect();
 
-    let mut sorted_vec: Vec<String> = unique_list_of_ip.into_iter().collect();
-    sorted_vec.sort(); // Sort the Vec
+    let mut sorted_vec: Vec<String> = unique_list_of_ip.clone().into_iter().collect();
+    sorted_vec = sort_ip_addresses(sorted_vec); // Sort the Vec
 
-    // Convert the sorted Vec back to a HashSet if needed
-    let _save_to_txt_file = save_to_txt_file(sorted_vec.into_iter().collect(), filename);
-
-
+    let _save_to_txt_file = save_vec_to_txt_file(sorted_vec , filename);
     Ok(())
 }
+
+
+fn sort_ip_addresses(mut ip_addresses: Vec<String>) -> Vec<String> {
+    ip_addresses.sort_by(|a, b| {
+        let octets_a: Vec<u8> = a.split('.').flat_map(str::parse).collect();
+        let octets_b: Vec<u8> = b.split('.').flat_map(str::parse).collect();
+
+        for (octet_a, octet_b) in octets_a.iter().zip(octets_b.iter()) {
+            if octet_a != octet_b {
+                return octet_a.cmp(octet_b);
+            }
+        }
+
+        std::cmp::Ordering::Equal
+    });
+
+    ip_addresses
+}
+
 
 fn clear_screen() {
     if cfg!(unix) {
@@ -257,10 +288,12 @@ fn find_available_segments() -> io::Result<()> {
         .difference(&in_use_ip_segments)
         .map(|s| s.clone())
         .collect();
-    
+
+    let mut sorted_vec: Vec<String> = available_ip_segments.clone().into_iter().collect();
+    sorted_vec = sort_ip_addresses(sorted_vec); // Sort the Vec
 
     let mut file = File::create("available_segments.txt")?;
-    for element in &available_ip_segments {
+    for element in sorted_vec {
         writeln!(file, "{}", element)?;
     }
 

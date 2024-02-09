@@ -8,7 +8,10 @@ import ipaddress
 
 current_dir = getcwd()
 routes = "{current_dir}\\routes.txt".format(current_dir = current_dir)
+full_routes_ocnus = "{current_dir}\\full_routes_ocnus.txt".format(current_dir = current_dir)
 ips = "{current_dir}\\ips.txt".format(current_dir = current_dir)
+full_managment_ip = "{current_dir}\\full_managment_ip.txt".format(current_dir = current_dir)
+managment_ip = "{current_dir}\\managment_ip.txt".format(current_dir = current_dir)
 latency_avg = 0
 ttl_avg = 0
 hostname = '10.1.36.1'
@@ -303,6 +306,7 @@ def connection_octus_netmiko():
 
 
 def find_missing_ip_cird_29(route_list):
+    global full_routes_ocnus
 
     i_range = range(2, 255)  # Range for the second octet
     j_range = range(0, 255, 8)  # Range for the third octet with intervals of 8
@@ -311,7 +315,9 @@ def find_missing_ip_cird_29(route_list):
 
     # Extract /29 IPs from the list
     existing_ips = {route.split()[2].split('[')[0] for route in route_list if '/29' in route}
-
+    #TESTING
+    save_list_to_txt(full_routes_ocnus, existing_ips)
+     
     # Identify the missing /29 IPs
     missing_ips = complete_ips - existing_ips
     result = sorted(missing_ips, key=lambda ip: ipaddress.IPv4Network(ip))
@@ -336,7 +342,8 @@ def get_number_before_dot(s):
         return s
 
 def find_management_ip(node_segment_initial, route_list):#return result
-
+    global full_managment_ip, managment_ip
+    
     if '.' in node_segment_initial:
         separeted = node_segment_initial.split(".")
         node_segment_initial = separeted[1]
@@ -351,7 +358,13 @@ def find_management_ip(node_segment_initial, route_list):#return result
     
     # Extract gateway values into a new list
     gateway_list = [entry.split("gateway=")[1].split(" ")[0] for entry in route_list]
+      #TESTING
+    save_list_to_txt(managment_ip, gateway_list)
+
     unique_gateways = list(set(gateway_list))
+     #TESTING
+    save_list_to_txt(full_managment_ip, unique_gateways)
+  
 
      # Generate the complete set of IPs
     
@@ -385,9 +398,11 @@ def print_ip_and_segment():
 def main():
     global ips
     connection_mikrotik_netmiko()
-    commands = command_mk_find_ip_management('52')
+    commands = command_mk_find_ip_management('32')
     route_list = exec_commands_in_mk(commands)
-    managment_ip = find_management_ip('52',route_list)
+    
+    managment_ip = find_management_ip('32',route_list)
+   
     save_list_to_txt(ips, managment_ip)
 
     route_list = connection_octus_netmiko()
