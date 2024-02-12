@@ -1,12 +1,17 @@
 mod data;
+//use std::borrow::{Borrow, Cow};
+use std::env;
 use std::net::TcpStream;
+use base64;
+use rpassword::read_password;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::error::Error;
 use ssh2::{Channel, Session};
+use std::time::{Duration, Instant};
 use std::process::Command;
 use std::str;
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 
 fn establish_ssh_connection(_address: &String,username: &str, password: &str,) -> Result<Session, Box<dyn std::error::Error>> {
     let _tcp = TcpStream::connect(_address)?;
@@ -53,6 +58,31 @@ fn clean_txt_file(filename: &str) -> io::Result<()>{
     Ok(())
 }
 
+fn read_list_ip() -> (Result<(), io::Error>, Vec<String>) {
+    // Open the file
+    let file = match File::open("list_ip.txt") {
+        Ok(f) => f,
+        Err(e) => return (Err(e), Vec::new()), // Return early if file opening fails
+    };
+
+    // Create a buffer reader to read the file line by line
+    let reader = io::BufReader::new(file);
+
+    // Create a vector to store lines
+    let mut lines = Vec::new();
+
+    // Read each line from the file and push it to the vector
+    for line in reader.lines() {
+        match line {
+            Ok(l) => lines.push(l),
+            Err(e) => return (Err(e), Vec::new()), // Return early if reading line fails
+        }
+    }
+
+    // Return success and the vector of lines
+    (Ok(()), lines)
+}
+/*
 fn save_to_txt_file(data: HashSet<String>, filename: &str) -> io::Result<()> {
 
     let mut file = OpenOptions::new().write(true).append(true).create(true).open(filename)?;
@@ -66,7 +96,7 @@ fn save_to_txt_file(data: HashSet<String>, filename: &str) -> io::Result<()> {
 
     Ok(())
 }
-
+*/
 fn save_vec_to_txt_file(data: Vec<String>, filename: &str) -> io::Result<()> {
 
     let mut file = OpenOptions::new().write(true).append(true).create(true).open(filename)?;
@@ -163,7 +193,6 @@ fn sort_ip_addresses(mut ip_addresses: Vec<String>) -> Vec<String> {
 
     ip_addresses
 }
-
 
 fn clear_screen() {
     if cfg!(unix) {
@@ -353,7 +382,7 @@ fn find_available_management_ip( middle_octet: &str, node_segment_initial: &str)
     Ok(())
 }
 
-fn option_3(username: &str, password: &str ){
+fn option_3(username:&str, password: &str ){
     let mut _router_segment:Vec<String> = Vec::new();
     let port: &str = "22";
     let (mut _segment1, mut _segment2, mut _host) = ip_segment_node_choice();
@@ -371,7 +400,7 @@ fn option_3(username: &str, password: &str ){
             let result = _segment2_i32 + iterator;
             _router_segment.insert(1, result.to_string());
 
-            let _find_ip_or_segment_in_use = find_ip_or_segment_in_use(&ssh_command, &_address, username, password, looking_for);            
+            let _find_ip_or_segment_in_use = find_ip_or_segment_in_use(&ssh_command, &_address, &username, &password, looking_for);            
     }
     //Find available_ip
     let _find_available_management_ip = find_available_management_ip(_segment1, _segment2);
@@ -381,7 +410,7 @@ fn option_3(username: &str, password: &str ){
     _host = "10.0.0.8"; //Reflector
     let _address = format!("{}:{}", _host, port).to_string();
     let ssh_command: String = "ip route print terse without-paging where dst-address~\"192.168\"\r\n".to_string();
-    let _find_ip_or_segment_in_use = find_ip_or_segment_in_use(&ssh_command, &_address, username, password, looking_for);
+    let _find_ip_or_segment_in_use = find_ip_or_segment_in_use(&ssh_command, &_address, &username, &password, looking_for);
     clear_screen();          
     //Find available_Segments
     let _find_available_segments = find_available_segments();
@@ -400,21 +429,246 @@ fn option_3(username: &str, password: &str ){
     let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
 }
 
+fn option_2(list_ip: Vec<String>, username: String, password: String){
+    fn check_files_exist() -> bool {
+        // Check if api.exe exists
+        let api_exists = fs::metadata("api.exe").is_ok();
+    
+        // Check if list_ip.txt exists
+        let list_ip_exists = fs::metadata("list_ip.txt").is_ok();
+    
+        api_exists && list_ip_exists
+    }
+    if check_files_exist(){
+        println!("Ejecutando pruebas de ping en otra ventana");
+    } else {
+        println!("No detectamos el archivo api.exe, verifique su antivirus")
+    }
+    let commands = command_ping_test(list_ip, username, password);
+
+    for command in &commands {
+        match Command::new("powershell")
+                        .arg("-Command")
+                        .arg(command)
+                        .output() {
+            Ok(output) => {
+                if output.status.success() {
+                    continue;
+                }
+                 else {
+                    eprintln!("Error executing command");
+                }
+            }
+            Err(_e) => {
+                eprintln!("Error executing command");
+            }
+        }
+    }
+    
+}
+
+fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -> Vec<String> {
+    let mut commands: Vec<String> = Vec::new();
+
+     // Define the path to the API executable file relative to the current directory
+    let api_path = {
+        let mut path = env::current_dir().unwrap();
+        path.push("api.exe");
+        path
+    };
+    let api = api_path.to_str().unwrap();
+
+    let titletab = [
+        "1-4",
+        "5-8",
+        "9-12",
+        "13-16",
+        "17-?",
+    ];
+    
+    let mut n = 0;
+    let mut i = 0;
+    let j = list_ip.len() - 1;
+    
+    while i < j {
+        if i < j && i == 0 {
+            let cmd1 = format!("wt.exe -w 1 --title {} {} {} {} {} {} {} {}", 
+                titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            i += 4;
+            commands.push(cmd1);
+        } else if i < j {
+            let cmd1 = format!("wt.exe -w 1 new-tab --title {} {} {} {} {} {} {} {}", 
+                titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            i += 4;
+            commands.push(cmd1);
+        } else {
+            break;
+        }
+
+        if i < j {
+            let cmd2 = format!("wt.exe -w 1 sp --title {} -V -c {} {} {} {} {} {} {}",
+                titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            i += 4;
+            commands.push(cmd2);
+        } else {
+            break;
+        }
+
+        commands.push("wt.exe -w 1 mf left".to_string());
+
+        if i < j {
+            let cmd4 = format!("wt.exe -w 1 sp --title {} -H -c {} {} {} {} {} {} {}",
+                titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            i += 4;
+            commands.push(cmd4);
+        } else {
+            break;
+        }
+
+        commands.push("wt.exe -w 1 mf right".to_string());
+
+        if i < j {
+            let cmd6 = format!("wt.exe -w 1 sp --title {} -H -c {} {} {} {} {} {} {}",
+                titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            i += 4;
+            n += 1;
+            commands.push(cmd6);
+        } else {
+            break;
+        }
+    }
+
+    commands
+}
+
+fn option_1() -> (String, String, bool){
+     // Check if Credentials.txt exists and its not empty
+    loop{ 
+        if let Ok(metadata) = fs::metadata("credentials.txt") {
+            // Check if the file is not empty
+            if metadata.len() > 0 {
+                //"File 'credentials.txt' exists and is not empty.";
+                let (_ok, username, password) = decode_user_password();
+                let logged = true;
+                return (username, password, logged)
+            } 
+        } else {
+            //"File 'credentials.txt' does not exist."
+            let _ask = ask_user_pass();
+            continue;
+        }
+    }
+}
+
+fn ask_user_pass() -> io::Result<()>{
+
+    println!("Ingrese su nombre de usuario: ");
+    let mut username = String::new();
+    io::stdin().read_line(&mut username).expect("Error al leer la entrada");
+    let username = username.trim();
+
+    // Solicita al usuario que ingrese una contraseña   
+    println!("Ingrese su contraseña: ");  
+
+    let password = read_password().unwrap();
+
+    let mut file = File::create("credentials.txt")?;
+    // Codificar a Base64
+    
+    let encoded_username = base64::encode(username);
+    println!("Texto codificado en Base64: {}", encoded_username);
+    writeln!(file, "{}", encoded_username)?;
+
+    let encoded_password = base64::encode(password);
+    println!("Texto codificado en Base64: {}", encoded_password);
+    writeln!(file, "{}", encoded_password)?;
+
+    Ok(())
+}
+
+fn decode_user_password() -> (io::Result<()> , String, String){
+    let mut _vec = Vec::new();
+    //let file = File::open("credentials.txt")?;
+
+    let file = match File::open("credentials.txt") {
+        Ok(f) => f,
+        Err(e) => panic!("Error opening file: {}", e),
+    };
+    let reader = BufReader::new(file);
+
+
+    // Initialize variables to hold the lines
+    //let mut lines = reader.lines();
+
+    for line in reader.lines(){
+        _vec.push(line.unwrap());
+    }
+    
+    let username = _vec.first().unwrap();
+    let password = _vec.last().unwrap();
+    
+    // Decodificar desde Base64 (solo para demostración)
+    let decoded_bytes = base64::decode(username).unwrap();
+    let username = String::from_utf8(decoded_bytes).unwrap();
+    
+
+    let decoded_bytes = base64::decode(password).unwrap();
+    let password  = String::from_utf8(decoded_bytes).unwrap();
+   
+    (Ok(()),username, password)
+}
+
+fn already_logged() -> (String, String, bool) {
+    let username:String = String::new();
+    let password:String = String::new();
+    let mut logged = false;
+    if let Ok(metadata) = fs::metadata("credentials.txt") {
+        // Check if the file is not empty
+        if metadata.len() > 0 {
+            let (_ok, username, password) = decode_user_password();
+            logged = true;
+            return (username, password, logged);
+        }
+        else {
+            return (username, password, logged);
+        }
+    } else{
+        return (username, password, logged);
+    }
+ }
+
 fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
+    let (_ok, list_ip) = read_list_ip();
+    let start_time = Instant::now();
+    let one_minute = Duration::from_secs(60);
+    
+    let (mut username, mut password, mut logged) = already_logged();
 
-    let username = "nramirez";
-    let password = "N3st0rR4m23*";    
-
-    println!("Bienvenido al Toolkit Netcom Nivel 1\n");
-    println!("¿Qué deseas realizar?");
-    println!("1) Iniciar sesión");
-    println!("2) Ejecutar pruebas de ping");
-    println!("3) Buscar IP y Segmento disponibles");
-    println!("4) Buscar IP dinámicas en todos los nodos (próximamente)");
-    println!("5) Reporte automatizado de latencias\n");
-
-    // Loop para permitir que el usuario ingrese opciones continuamente
+    let mut _iterator = 0;
     loop {
+        println!("###############################################################################");
+        println!("#                                                                             #");
+        println!("#                     Bienvenido al Toolkit Netcom Nivel 1                    #") ;
+        
+        println!("#\t¿Qué deseas realizar?                                                 #");
+        if logged{
+            println!("#\t1) Sesion iniciada como {} ¿Cerrar sesion?", username);
+        } else {
+            println!("#\t1) Iniciar sesión                                                     #");
+        }
+        println!("#\t2) Ejecutar pruebas de ping                                           #");
+        
+        println!("#\t3) Buscar IP y Segmento disponibles                                   #");
+        
+        println!("#\t4) Buscar IP dinámicas en todos los nodos (próximamente)              #");
+        
+        println!("#\t5) Reporte automatizado de latencias                                  #");
+        println!("#                                                                             #");
+        println!("###############################################################################");
+        println!("                                                  Programado por Nestor Ramirez\n");
+        println!("\n");
+
+        // Loop para permitir que el usuario ingrese opciones continuamente
         // Solicitar al usuario que ingrese una opción
         println!("Por favor, ingresa el número de la opción que deseas ejecutar:");
         let mut input = String::new();
@@ -429,12 +683,32 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
             }
         };
 
+        if start_time.elapsed() >= one_minute {
+            println!("No option selected. Exiting program.");
+            break;
+        }
         // Ejecutar la opción seleccionada
         match option {
-            1 => println!("Iniciando sesión..."),
-            2 => println!("Ejecutando pruebas de ping..."),
-            3 => {
-                 option_3(username, password);
+            1 => {//Iniciar sesión 
+                if logged{
+                    //LogOut delete "credentials.txt"
+                    logged = false;
+                    let file = "credentials.txt";
+                    match fs::remove_file(file) {
+                        Ok(()) => println!("File '{}' successfully deleted.", file),
+                        Err(e) => println!("Error deleting file '{}': {}", file, e),
+                    }
+                }else{
+                    (username, password, logged) = option_1();
+                }
+            },
+
+            2 => {//Ejecutar pruebas de ping  
+                option_2(list_ip.clone(), username.clone(), password.clone());
+            },
+            
+            3 => {//Buscar IP y Segmento disponibles 
+                 option_3(&username, &password);
             },
             4 => println!("Buscando IP dinámicas en todos los nodos (próximamente)..."),
             5 => println!("Generando reporte automatizado de latencias..."),
@@ -443,8 +717,10 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
 
         // Salir del loop si se ha ejecutado una opción válida
         if option >= 1 && option <= 5 {
-            break;
-        }
+            clear_screen();
+            }
+            
+        
     }Ok(())
 }
 

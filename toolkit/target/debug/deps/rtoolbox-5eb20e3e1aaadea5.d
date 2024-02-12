@@ -1,0 +1,10 @@
+C:\Toolkit_Netcom\toolkit_netcom\toolkit\target\debug\deps\librtoolbox-5eb20e3e1aaadea5.rmeta: C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\lib.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\atty.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\fix_line_issues.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\print_tty.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_string.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_vec.rs
+
+C:\Toolkit_Netcom\toolkit_netcom\toolkit\target\debug\deps\rtoolbox-5eb20e3e1aaadea5.d: C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\lib.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\atty.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\fix_line_issues.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\print_tty.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_string.rs C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_vec.rs
+
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\lib.rs:
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\atty.rs:
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\fix_line_issues.rs:
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\print_tty.rs:
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_string.rs:
+C:\Users\Nestor\ Ramirez\.cargo\registry\src\index.crates.io-6f17d22bba15001f\rtoolbox-0.0.2\src\safe_vec.rs:
