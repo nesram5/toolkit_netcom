@@ -11,7 +11,7 @@ use crossterm::{execute, cursor, terminal};
 
 const BANNER_LINE: u16 = 20;
 const PING_RESULTS_START_LINE: u16 = 1;
-const PING_RESULTS_END_LINE: u16 = 15;
+const PING_RESULTS_END_LINE: u16 = 16;
 
 fn establish_ssh_connection(address: &String,username: &str, password: &str) -> Result<Session, Box<dyn std::error::Error>> {
     let _tcp = TcpStream::connect(address)?;
@@ -22,7 +22,7 @@ fn establish_ssh_connection(address: &String,username: &str, password: &str) -> 
     sess.host_key();
     sess.userauth_password(username, password)?;
     if !sess.authenticated() {
-        return Err("Authentication failed".into());
+        return Err("Credenciales invalidas".into());
     }
     Ok(sess)
 }
@@ -199,10 +199,11 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<f32>, Vec<i32>){
 fn print_line(content: &str, line: u16) -> io::Result<()> {
     execute!(
         io::stdout(),
-        cursor::MoveTo(1, line),
+        //cursor::MoveTo(1, line),
+        cursor::MoveTo(0, line),
         terminal::Clear(terminal::ClearType::CurrentLine)
     )?;
-    print!("{}", content);
+    println!("{}", content);
     io::stdout().flush().unwrap();
     Ok(())
 }
@@ -316,11 +317,11 @@ fn start() ->  std::io::Error {
     let session = establish_ssh_connection(&address, username, password)
         .map_err(|err| {
             // Wrap the error in a custom std::io::Error
-            io::Error::new(io::ErrorKind::Other, format!("SSH connection error: {}", err))
+            io::Error::new(io::ErrorKind::Other, format!("No fue posible conectarse al router: {} \n{}",address, err))
         });
 
-    let channel: Result<Channel, ssh2::Error> = session.expect("REASON").channel_session();
-    let _ssh_continuos_output = ssh_continuous_output(channel.expect("REASON"),  &title, &command);
+    let channel: Result<Channel, ssh2::Error> = session.expect("No fue posible conectar con el router").channel_session();
+    let _ssh_continuos_output = ssh_continuous_output(channel.expect("Error leyendo la respuesta del router"),  &title, &command);
     let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
     
     let custom_error_message = "Custom error message";
