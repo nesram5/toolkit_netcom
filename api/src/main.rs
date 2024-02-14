@@ -20,6 +20,7 @@ fn establish_ssh_connection(address: &String,username: &str, password: &str) -> 
     sess.handshake()?;
     // Password-based authentication
     sess.host_key();
+    let _know_host = sess.known_hosts();
     sess.userauth_password(username, password)?;
     if !sess.authenticated() {
         return Err("Credenciales invalidas".into());
@@ -317,14 +318,14 @@ fn start() ->  std::io::Error {
     let session = establish_ssh_connection(&address, username, password)
         .map_err(|err| {
             // Wrap the error in a custom std::io::Error
-            io::Error::new(io::ErrorKind::Other, format!("No fue posible conectarse al router: {} \n{}",address, err))
+            io::Error::new(io::ErrorKind::Other, format!("No fue posible conectarse al router: {} \n\n{}",address, err))
         });
 
-    let channel: Result<Channel, ssh2::Error> = session.expect("No fue posible conectar con el router").channel_session();
-    let _ssh_continuos_output = ssh_continuous_output(channel.expect("Error leyendo la respuesta del router"),  &title, &command);
+    let channel: Result<Channel, ssh2::Error> = session.expect("No fue posible establecer el canal").channel_session();
+    let _ssh_continuos_output = ssh_continuous_output(channel.expect("No fue posible establecer el canal"),  &title, &command);
     let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
     
-    let custom_error_message = "Custom error message";
+    let custom_error_message = "No fue posible conectarse al router";
     io::Error::new(io::ErrorKind::Other, custom_error_message)
     
     

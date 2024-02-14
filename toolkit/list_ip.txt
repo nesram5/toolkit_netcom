@@ -61,7 +61,7 @@ TD_Int_Dayco-Fundacion
 TD_Int_Dayco-Paseo
 172.16.0.73
 172.16.0.74
-10.10.36.1
+45.182.141.53
 TD_Int_VLAN3000-Parral-Dayco
 172.16.2.1
 172.16.2.2

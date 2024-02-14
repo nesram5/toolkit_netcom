@@ -1,12 +1,12 @@
 #pragma code_page(65001)
 1 VERSIONINFO
-FILESUBTYPE 0x0
-FILEFLAGSMASK 0x3f
-FILEFLAGS 0x0
-FILEOS 0x40004
 FILEVERSION 1, 1, 0, 0
-FILETYPE 0x1
+FILEFLAGSMASK 0x3f
 PRODUCTVERSION 1, 1, 0, 0
+FILEOS 0x40004
+FILESUBTYPE 0x0
+FILEFLAGS 0x0
+FILETYPE 0x1
 {
 BLOCK "StringFileInfo"
 {
@@ -14,8 +14,8 @@ BLOCK "000004b0"
 {
 VALUE "FileVersion", "1.1.0"
 VALUE "ProductVersion", "1.1.0"
-VALUE "ProductName", "api"
 VALUE "FileDescription", "api"
+VALUE "ProductName", "api"
 }
 }
 BLOCK "VarFileInfo" {

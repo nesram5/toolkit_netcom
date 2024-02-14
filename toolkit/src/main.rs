@@ -1,5 +1,5 @@
 mod data;
-use std::{env, result};
+use std::env;
 use std::net::TcpStream;
 use base64;
 use rpassword::read_password;
@@ -85,12 +85,21 @@ fn save_vec_to_txt_file(data: Vec<String>, filename: &str) -> io::Result<()> {
 
     let mut file = OpenOptions::new().write(true).append(true).create(true).open(filename)?;
    
-
     // Iterate through the data and write each element to the file
     for line in data {
         writeln!(file, "{}", line)?;
     }
 
+    Ok(())
+}
+fn save_command_to_bat(data: Vec<String>, filename: &str) -> io::Result<()> {
+
+    let mut file = OpenOptions::new().write(true).create(true).open(filename)?;
+   
+    // Iterate through the data and write each element to the file
+    for line in data {
+        write!(file, "{}", line)?;
+    }
 
     Ok(())
 }
@@ -410,10 +419,10 @@ fn option_3(username:&str, password: &str ){
         // Use an iterator to iterate over the lines
         for (line_number, line) in reader.lines().enumerate() {
             // Check if we've printed 5 lines already
-            if line_number >= 382 && line_number <= 387{
+            if line_number >= 1308 && line_number <= 1313{
                 println!("{}", line?);
                  // Exit the loop once we've printed 5 lines
-            } else if line_number == 388 {
+            } else if line_number == 1314 {
                 break;
             }
     
@@ -438,41 +447,34 @@ fn option_2(list_ip: Vec<String>, username: String, password: String){
     
         // Check if list_ip.txt exists
         let list_ip_exists = fs::metadata("list_ip.txt").is_ok();
-    
+        
         api_exists && list_ip_exists
     }
+
     if check_files_exist(){
         println!("Ejecutando pruebas de ping en otra ventana");
     } else {
-        println!("No detectamos el archivo api.exe, verifique su antivirus")
+        println!("No detectamos el archivo api.exe o \\terminal\\wt.exe, verifique su antivirus")
     }
-    let commands = command_ping_test(list_ip, username, password);
+    let (_ok, commands) = command_ping_test(list_ip, username, password);
 
-    for command in &commands {
-        match Command::new("powershell")
-                        .arg("-Command")
-                        .arg(command)
-                        .output() {
-            Ok(output) => {
-                if output.status.success() {
-                    continue;
-                }
-                 else {
-                    eprintln!("");
-                }
-            }
-            Err(_e) => {
-                eprintln!("");
-            }
+    let _save_to_txt_file =  save_command_to_bat(commands, "commands.bat");
+ 
+        let _status = Command::new("cmd")
+        .args(&["/C", "commands.bat"])
+        .status()
+        .expect("Failed to execute bat file");
+        let _file_path = "commands.bat"; 
+        match fs::remove_file("commands.bat") {
+          Ok(_) => println!("File '{}' deleted successfully", _file_path),
+           Err(err) => eprintln!("Failed to delete file '{}': {}", _file_path, err),
         }
-    }
-    
+        
 }
-
-fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -> Vec<String> {
+  
+fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -> (io::Result<()>,Vec<String>) {
     let mut commands: Vec<String> = Vec::new();
 
-     // Define the path to the API executable file relative to the current directory
     let api_path = {
         let mut path = env::current_dir().unwrap();
         path.push("api.exe");
@@ -482,7 +484,7 @@ fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -
     // Define the path to the WT executable file relative to the current directory
     let wt_patch: String  = api.to_string();
     let wt: String = wt_patch.replace("\\api.exe", "\\terminal\\wt.exe");
-
+     
 
     let titletab = [
         "1-4",
@@ -495,16 +497,19 @@ fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -
     let mut n = 0;
     let mut i = 0;
     let j = list_ip.len() - 1;
-    
+    let echo_of ="ECHO OFF\n".to_string();
+    commands.push(echo_of);
     while i < j {
+        
         if i < j && i == 0 {
-            let cmd1 = format!("{} -M -w 10 --title {} {} {} {} {} {} {} {}", 
+            
+            let cmd1 = format!("\"{}\" -M -w 1 --title {} \"{}\" {} {} {} {} {} {} ", 
                 wt, titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
             i += 4;
             commands.push(cmd1);
         } else if i < j {
-            let cmd1 = format!("{} -w 10 new-tab --title {} {} {} {} {} {} {} {}", 
-            wt,titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            let cmd1 = format!("; -w 1 new-tab --title {} \"{}\" {} {} {} {} {} {}", 
+            titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
             i += 4;
             commands.push(cmd1);
         } else {
@@ -512,30 +517,26 @@ fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -
         }
 
         if i < j {
-            let cmd2 = format!("{} -w 10 sp --title {} -V -c {} {} {} {} {} {} {} ; mf left ",
-            wt,titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            let cmd2 = format!("; -w 1 sp --title {} -V -c \"{}\" {} {} {} {} {} {} ; mf right ",
+            titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
             i += 4;
             commands.push(cmd2);
         } else {
             break;
         }
 
-        //commands.push(format!("{} -w 10 mf left",wt).to_string());
-
         if i < j {
-            let cmd4 = format!("{} -w 10 sp --title {} -H -c {} {} {} {} {} {} {} ; mf left",
-            wt,titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            let cmd4 = format!("; -w 1 sp --title {} -H -c \"{}\" {} {} {} {} {} {} ; mf left",
+            titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
             i += 4;
             commands.push(cmd4);
         } else {
             break;
         }
 
-        commands.push(format!("{} -w 10 mf left",wt).to_string());
-
         if i < j {
-            let cmd6 = format!("{} -w 10 sp --title {} -H -c {} {} {} {} {} {} {}",
-            wt,titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
+            let cmd6 = format!("; -w 1 sp --title {} -H -c \"{}\" {} {} {} {} {} {}",
+            titletab[n], api, list_ip[i], list_ip[i+1], list_ip[i+2], list_ip[i+3], username, password);
             i += 4;
             n += 1;
             commands.push(cmd6);
@@ -544,7 +545,7 @@ fn command_ping_test(list_ip: Vec<String>, username: String, password: String) -
         }
     }
 
-    commands
+    (Ok(()),commands)
 }
 
 fn option_1() -> (String, String, bool){
@@ -603,11 +604,9 @@ fn ask_user_pass() -> io::Result<()>{
     // Codificar a Base64
     
     let encoded_username = base64::encode(_username);
-    println!("Texto codificado en Base64: {}", encoded_username);
     writeln!(file, "{}", encoded_username)?;
 
     let encoded_password = base64::encode(_password);
-    println!("Texto codificado en Base64: {}", encoded_password);
     writeln!(file, "{}", encoded_password)?;
 
     Ok(())
@@ -615,17 +614,12 @@ fn ask_user_pass() -> io::Result<()>{
 
 fn decode_user_password() -> (io::Result<()> , String, String){
     let mut _vec = Vec::new();
-    //let file = File::open("credentials.txt")?;
 
     let file = match File::open("credentials.txt") {
         Ok(f) => f,
         Err(e) => panic!("Error opening file: {}", e),
     };
     let reader = BufReader::new(file);
-
-
-    // Initialize variables to hold the lines
-    //let mut lines = reader.lines();
 
     for line in reader.lines(){
         _vec.push(line.unwrap());
@@ -733,6 +727,7 @@ fn  option_4(username:String, password:String) -> Result<(), std::io::Error>{
     Ok(())
 }
 
+
 fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
     let (_ok, list_ip) = read_list_ip();
         
@@ -740,6 +735,7 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
 
     let mut _iterator = 0;
     loop {
+        clear_screen();
         println!("###############################################################################");
         println!("#                                                                             #");
         println!("#                     Bienvenido al Toolkit Netcom Nivel 1                    #") ;
@@ -756,7 +752,7 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
         
         println!("#\t4) Buscar IP dinámicas en todos los nodos                             #");
         
-        println!("#\t5) Reporte automatizado de latencias                                  #");
+        println!("#\t5) Reporte automatizado de latencias (Proximamente)                   #");
         println!("#\t6) Cerrar                                                             #");
         println!("#                                                                             #");
         println!("###############################################################################");
@@ -786,12 +782,17 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
                     logged = false;
                     let file = "credentials.txt";
                     match fs::remove_file(file) {
-                        Ok(()) => println!("File '{}' successfully deleted.", file),
+                        Ok(()) => {
+                            clear_screen();
+                            println!("Credenciales borradas");
+                            let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
+                            },
                         Err(e) => println!("Error deleting file '{}': {}", file, e),
                     }
                 }else{
                     //Iniciar sesión
                     (username, password, logged) = option_1();
+                    clear_screen();
                 }
             },
 
@@ -799,7 +800,9 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
                 if logged{
                     option_2(list_ip.clone(), username.clone(), password.clone());
                 }else {
-                    println!("Debes iniciar sesion, para ejecutar esta función")
+                    clear_screen();
+                    println!("Debes iniciar sesion, para ejecutar esta función");
+                    let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
                 }
                     
             },
@@ -809,7 +812,9 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
                     option_3(&username, &password);
                     
                 }else {
-                    println!("Debes iniciar sesion, para ejecutar esta función")
+                    clear_screen();
+                    println!("Debes iniciar sesion, para ejecutar esta función");
+                    let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
                 }
             },
             4 => { //"Buscando IP dinámicas en todos los nodos (próximamente)..."),
@@ -818,11 +823,23 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
                     let _option = option_4(username.clone(), password.clone());
                     
                 }else {
-                    println!("Debes iniciar sesion, para ejecutar esta función")
+                    clear_screen();
+                    println!("Debes iniciar sesion, para ejecutar esta función");
+                    let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
                 }
             },
 
-            5 => println!("Generando reporte automatizado de latencias..."),
+            5 => {
+                if logged{
+                    println!("Generando reporte de latencias automatizado");
+                    let _option = option_5(list_ip, &username, &password);
+                    
+                }else {
+                    clear_screen();
+                    println!("Debes iniciar sesion, para ejecutar esta función");
+                    let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
+                }
+            },
             6 => //Cerrar
                 break,
             _ => println!("Opción no válida. Por favor, ingresa un número del 1 al 5."),
