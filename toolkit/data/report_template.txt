@@ -1,0 +1,30 @@
+#01 ▶️ _Status de la red y de los reportes de fallas del servicio_ * _date_ _hour_am_pm_ *
+#02
+#03 📌 *Chats en espera:* 
+#04 	*Bandeja de especialistas:* 
+#05 	*Bandeja de ATC:* 
+#06
+#07 📌 *Tickets en progreso por Especialistas:* 
+#08
+#09 * Latencia en los proveedores y Servicios de transporte de datos:*
+#10
+#11 _Proveedores:_
+$12	🌐 *Fibex:* Proveedor_FIBEX
+$13	🌐 *Digitel:* Proveedor_Digitel_Carabobo
+$14	🌐 *Digitel Aragua:* Proveedor_Digitel_Aragua
+$15	🌐 *Inter Carabobo:* Proveedor_InterCarabobo
+$16	🌐 *Inter Aragua:* Proveedor_Inter_Aragua
+#17
+#18 _Transportes:_  Externo: 🟤 Interno:🔵
+$19	🟤 *Puerto Cabello - Digitel:* TD_Pto_Digitel
+$20	🟤 *Puerto Cabello - Fibex:* TD_Pto_Fibex
+$21	🟤 *Guacara - Fibex:* TD_Fibex_Guacara
+$22	🟤 *Mirador - Fibex:* TD_Fibex_Mirador
+$23	🟤 *Netcom Plus Maracay - VistaHermosa:* TD_Fibex_VistaHermosa
+$24	🟤 *Netcom Plus Maracay - Caribe/Morita:* TD_Fibex_CaribeMorita
+$25	🔵 *Netcom Plus Maracay - Caribe to Vista Hermosa:* TD_Int_Caribe_VistaHer
+$26	🔵 *Dayco - Guacara:* TD_Int_Dayco_Guacara
+$27	🔵 *Dayco - Los Parques:* TD_Int_Dayco_Parques
+$28	🔵 *Dayco - Fundacion Mendoza:* TD_Int_Dayco_Fundacion
+$29	🔵 *Dayco - Paseo las industrias:* TD_Int_Dayco_Paseo
+$30	🔵 *Siklu Copey - Parral:* TD_Int_VLAN3000_Parral_Dayco

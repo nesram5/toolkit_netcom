@@ -1,0 +1,4 @@
+{
+    "default_ro_test_login":"10.0.0.8:22",
+    "default_ro_search_segments":"10.0.0.8:22"
+}

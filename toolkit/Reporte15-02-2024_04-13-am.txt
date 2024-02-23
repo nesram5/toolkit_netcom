@@ -1,0 +1,30 @@
+▶️ _Status de la red y de los reportes de fallas del servicio_ *15/02/2024 04:13 am*
+
+📌 *Chats en espera:* 
+	*Bandeja de especialistas:* 
+	*Bandeja de ATC:* 
+
+📌 *Tickets en progreso por Especialistas:* 
+
+*Latencia en los proveedores y Servicios de transporte de datos:*
+
+_Proveedores:_
+	🌐 *Fibex:* 0.22158998 ms 0 %
+	🌐 *Digitel:* 0.02 ms 0 %
+	🌐 *Digitel Aragua:* 0.57563 ms 0 %
+	🌐 *Inter Carabobo:* 0.08 ms 0 %
+	🌐 *Inter Aragua:* Error  0 %
+
+_Transportes:_  Externo: 🟤 Interno:🔵
+	🟤 *Puerto Cabello - Digitel:* 33 ms 0 %
+	🟤 *Puerto Cabello - Fibex:* 34 ms 0 %
+	🟤 *Guacara - Fibex:* 63.06 ms 0 %
+	🟤 *Mirador - Fibex:* 37 ms 1 %
+	🟤 *Netcom Plus Maracay - VistaHermosa:* 1.05 ms 0 %
+	🟤 *Netcom Plus Maracay - Caribe/Morita:* 1.12 ms 0 %
+	🔵 *Netcom Plus Maracay - Caribe to Vista Hermosa:*0 ms 1 %
+	🔵 *Dayco - Guacara:* 0.09 ms 0 %
+	🔵 *Dayco - Los Parques:* 0.61 ms 0 %
+	🔵 *Dayco - Fundacion Mendoza:* 1.00821 ms 0 %
+	🔵 *Dayco - Paseo las industrias:* 0.22158998 ms 0 %
+	🔵 *Siklu Copey - Parral:* 0.02 ms 0 %
