@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, Write};
 
 
-pub fn establish_ssh_connection(address: &String,username: &str, password: &str) -> Result<Session, Box<dyn std::error::Error>> {
+pub fn establish_ssh_connection(address: String,username: &str, password: &str) -> Result<Session, Box<dyn std::error::Error>> {
     let _tcp = TcpStream::connect(address)?;
     let mut sess = Session::new()?;
     sess.set_tcp_stream(_tcp);

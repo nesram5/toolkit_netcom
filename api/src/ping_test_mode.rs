@@ -18,14 +18,16 @@ use crate::ssh::establish_ssh_connection;
 use crate::auxiliar::{calculate_packet_loss, calculate_average_latency, parse_latency_value, calculate_average_ttl, clear_screen, print_line, clear_lines, find_min_max};
 
 
-pub fn ping_test_mode(username: &str, password: &str, address:String, title:String, command: String)  ->  std::io::Error {
+pub fn ping_test_mode(username: &str, password: &str, address: &str, title: &str, command: &str)  ->  std::io::Error {
     //ON live logic
-    let _address = address.clone();
-
-    let _session = establish_ssh_connection(&address, &username, &password)
+   let _address = String::from(address);
+   let mut i = 0;
+   loop {
+    
+    let _session = establish_ssh_connection(address.to_string(), &username, &password)
         .map_err(|_err| {
             // Wrap the error in a custom std::io::Error
-            io::Error::new(io::ErrorKind::Other, format!("No fue posible establecer sesion con el router: {} ",address))
+            io::Error::new(io::ErrorKind::Other, format!("No fue posible establecer sesion con el router: {} ",&address))
         });
 
     let (sender, receiver) = mpsc::channel();
@@ -58,17 +60,19 @@ pub fn ping_test_mode(username: &str, password: &str, address:String, title:Stri
         Err(_) => {
             // Timeout reached 
             clear_screen();
-            println!("\t\tNo fue posible conectarse al router {} \n\t\t{}",address.clone(), title);
+            println!("\t\tNo fue posible conectarse al router {} \n\t\t{}",&address, &title);
             let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
-            process::exit(0);
+            //process::exit(0);
         }
     }
 
       //Time controled command 2
       let (sender, receiver) = mpsc::channel();
-            
+      let _address = address.to_string();
+      let _title = title.to_string();
+      let _command = command.to_string();      
       let _handle = thread::spawn(move || {
-         let res = ping_test_continous_output(_channel_result.expect("ss").unwrap(),  &title, address.clone(), &command).unwrap();
+         let res = ping_test_continous_output(_channel_result.expect("ss").unwrap(), _title, _address, _command).unwrap();
  
          sender.send(res).expect("Error de conexion");
      });
@@ -84,19 +88,27 @@ pub fn ping_test_mode(username: &str, password: &str, address:String, title:Stri
          Err(_) => {
              // Timeout reached 
              clear_screen();
-             println!("\t\tEl router {} se encuentra colgado",_address.clone());
+             println!("\t\tEl router {} se encuentra colgado",&address);
              let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
-             process::exit(0);
+             //process::exit(0);
          }
      }
-
+     
+     i+=1;
+     if i == 3{
+        break;
+     }     
+     clear_screen();
+     println!("Vamos a intentarlo de nuevo");
+     std::thread::sleep(Duration::from_secs(2));
+    }
 
     let custom_error_message = "No fue posible conectarse al router";
     io::Error::new(io::ErrorKind::Other, custom_error_message)
 }
 
 
-fn process_ssh_terminal(buffer: &mut [u8; 4096],address:String, title: &String) -> (Vec<f32>, Vec<i32>){
+fn process_ssh_terminal(buffer: &mut [u8; 4096],address:String, title: String) -> (Vec<f32>, Vec<i32>){
     let mut ttl: Vec<i32> = Vec::new();
     let mut latency: Vec<f32> = Vec::new();
     let mut reader = BufReader::new(Cursor::new(&mut buffer[..]));
@@ -163,7 +175,7 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096],address:String, title: &String) 
 
 }
  
-fn ping_test_continous_output (mut channel: Channel, title: &String, address:String, command: &String) -> Result<(), Box<dyn Error>> {
+fn ping_test_continous_output (mut channel: Channel, title: String, address:String, command: String) -> Result<(), Box<dyn Error>> {
     clear_screen();
     let mut latency:Vec<f32> = Vec::new();
     let mut ttl:Vec<i32> = Vec::new();
@@ -174,7 +186,7 @@ fn ping_test_continous_output (mut channel: Channel, title: &String, address:Str
     let mut _ttl_average:i32 = 0;
         // Open a channel and execute the command0480
 
-    let _channel: Result<(), ssh2::Error> = channel.exec(command);    
+    let _channel: Result<(), ssh2::Error> = channel.exec(&command);    
 
 
     let mut buffer = [0; 4096];
@@ -192,7 +204,7 @@ fn ping_test_continous_output (mut channel: Channel, title: &String, address:Str
         
         // Process the continuous output
         //print!("{}", str::from_utf8(&buffer)?);
-        let (latency_result, ttl_result) = process_ssh_terminal(&mut buffer, address.clone(), title);
+        let (latency_result, ttl_result) = process_ssh_terminal(&mut buffer, address.to_string(), title.to_string());
 
         latency.extend(latency_result);
         

@@ -11,12 +11,12 @@ use crate::data;
 
 pub fn option_3(username:&str, password: &str ){
     let mut _router_segment:Vec<String> = Vec::new();
-    let port: &str = "22";
-    let (mut _segment1, mut _segment2, mut _host) = ip_segment_node_choice();
+    //let port: &str = "22";
+    let (mut _segment1, mut _segment2, mut _address) = ip_segment_node_choice();
                 _router_segment.push(_segment1.to_string());
                 _router_segment.push(_segment2.to_string());
 
-    let _address = format!("{}:{}", _host, port).to_string();
+    //let _address = format!("{}:{}", _host, port).to_string();
     //FIND IP In Use first
     let mut looking_for: &str = "gateway=";
     let mut iterator = 0;

@@ -48,7 +48,7 @@ fn menu() -> std::result::Result<(), Box<dyn std::error::Error>>  {
         println!("#\t4) Buscar IP dinámicas en todos los nodos FTTH                        #");
         
         println!("#\t5) Reporte de latencias de Proveedores y TD                           #");
-        println!("#\t6) Reporte de baterias y monitor electrico (Poximamente)              #");
+        println!("#\t6) Reporte de baterias y monitor electrico (Proximamente)              #");
         println!("#\t7) Cerrar                                                             #");
         println!("#                                                                             #");
         println!("###############################################################################");

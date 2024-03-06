@@ -1,0 +1,6 @@
+Ip dinamicas del nodo: MRD 10.1.44.1:22
+
+-----------------------------
+
+Ip dinamicas del nodo: CEC 10.1.20.1:22
+

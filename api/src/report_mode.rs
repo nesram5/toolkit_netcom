@@ -14,7 +14,7 @@ pub fn report_mode(username: &str, password: &str, address:String, title:String,
 
     let _res = default_report(title.clone());
 
-    let session = establish_ssh_connection(&address, username, password)
+    let session = establish_ssh_connection(address.clone(), username, password)
         .map_err(|err| {
             io::Error::new(io::ErrorKind::Other, format!("No fue posible conectarse al router: {}         {}",address, err))
         });
@@ -46,7 +46,7 @@ pub fn report_mode(username: &str, password: &str, address:String, title:String,
         Err(_) => {
             // Timeout reached 
             clear_screen();
-            println!("\t\tNo fue posible conectarse al router {} \n\t\t{}",address.clone(), title);
+            println!("\t\tNo fue posible conectarse al router {} \n\t\t{}",address.clone(), title.clone());
             process::exit(0);
         }
     }
@@ -55,7 +55,7 @@ pub fn report_mode(username: &str, password: &str, address:String, title:String,
     let (sender, receiver) = mpsc::channel();
             
     let _handle = thread::spawn(move || {
-       let res = process_and_save_report(_channel_result.expect("Error").unwrap(),  &title.clone(), &command).unwrap();
+       let res = process_and_save_report(_channel_result.expect("Error").unwrap(), title.clone(), &command).unwrap();
 
        sender.send(res).expect("Error de conexion");
    });
@@ -79,7 +79,7 @@ pub fn report_mode(username: &str, password: &str, address:String, title:String,
     io::Error::new(io::ErrorKind::Other, custom_error_message)
 }
 
-fn process_and_save_report (mut channel: Channel, _title: &String, command: &String) -> Result<(), Box<dyn Error>>{
+fn process_and_save_report (mut channel: Channel, _title: String, command: &String) -> Result<(), Box<dyn Error>>{
     let mut latency:Vec<f32> = Vec::new();
     let mut _latency_average:f32 = 0.0;
     let mut _packet_loss:f32 = 0.0;
@@ -117,14 +117,21 @@ fn default_report(title: String) -> io::Result<()> {
 fn save_report_to_txt_file(title: String, latency_avg: f32, packet_lost_percentage:f32 ) -> io::Result<()> {
     let path_report_file = return_path(&title, "cache");
     let mut file = OpenOptions::new().write(true).create(true).open(path_report_file)?;
+    if packet_lost_percentage == 100.0{
+        writeln!(file, "DOWN 🚨")?;
+        writeln!(file, "")?;
+        return Ok(());
+    }
+    
     if latency_avg > 45.0{
         writeln!(file, "{:.2} ms 🚨", latency_avg)?;
     }
     else {
         writeln!(file, "{:.2} ms", latency_avg)?;
     }
+    
     if packet_lost_percentage != 0.0{
-        writeln!(file, "{:.2} % PL 🚨", packet_lost_percentage)?;
+       writeln!(file, " {:.2} % PL 🚨", packet_lost_percentage)?;  
     }
     else {
         writeln!(file, "")?;

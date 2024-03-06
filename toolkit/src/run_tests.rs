@@ -22,7 +22,7 @@ pub fn option_2(list_ip: Vec<String>, username: String, password: String){
             eprintln!("Error: {}", err);
         }
     }
-    ;
+    
     let command_ = path_commands.to_str().unwrap_or_default();
         let _status = Command::new("cmd.exe")
         .arg("/c")
