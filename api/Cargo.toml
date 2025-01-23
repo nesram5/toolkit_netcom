@@ -9,6 +9,9 @@ edition = "2021"
 ssh2 = "0.9.4"
 crossterm = "0.27.0"
 dirs = "5.0.1"
+mysql_async = "0.35.1"
+tokio = "1.43.0"
+twox-hash = "=2.1.0"
 
 [build-dependencies]
 winres = "0.1.12"

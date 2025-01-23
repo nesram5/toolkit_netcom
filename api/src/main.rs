@@ -2,6 +2,7 @@ mod report_mode;
 mod ping_test_mode;
 mod ssh;
 mod auxiliar;
+mod upload_to_db;
 use std::env;
 use std::io;
 //use ping_test_mode::test;
@@ -11,12 +12,13 @@ use std::io;
 use crate::ssh::check_ssh_config;
 use crate::report_mode::report_mode;
 use crate::ping_test_mode::ping_test_mode;
+use crate::upload_to_db::upload_mode;
 
 fn start() ->  io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 8 {
-        eprintln!("Usage: {} <title> <host_port> <username> <password> <source_address> <destination_address> <on_live_test_or_report>", args[0]);
+        eprintln!("Usage: {} <title> <destination_address> <source_address> <host:port> <username> <password> <on_live_test(1)_or_report(2)>", args[0]);
         std::process::exit(1);
     }
     //let port: &str = "22";
@@ -43,6 +45,10 @@ fn start() ->  io::Result<()> {
     2 => {
         let command: String = format!("ping {} src-address={}", destination_address, source_address);
         report_mode(&username, &password,address.to_string(), title.to_string().clone(), command.clone());
+    }
+    3 => {
+        let command: String = format!("ping {} src-address={}", destination_address, source_address);
+        upload_mode(&username, &password,address.to_string(), title.to_string().clone(), command.clone());
     }
     _ => {println!("Opcion Invalida")}
     }

@@ -3,7 +3,6 @@ use std::net::TcpStream;
 use std::fs;
 use std::io::{self, Write};
 
-
 pub fn establish_ssh_connection(address: String,username: &str, password: &str) -> Result<Session, Box<dyn std::error::Error>> {
     let _tcp = TcpStream::connect(address)?;
     let mut sess = Session::new()?;
