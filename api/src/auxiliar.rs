@@ -77,21 +77,30 @@ pub fn find_min_max(latencies: &Vec<f32>) -> (f32 , f32) {
 }
 
 pub fn parse_latency_value(element: &str) -> f32 {
-    if element.contains("ms") && element.contains("us") {
-        let value = element.split_whitespace().nth(4).unwrap_or_default();
-        let (ms, us) = value.split_at(value.find("ms").unwrap_or_default());
-        ms.parse::<f32>().unwrap_or_default() + us.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
-    } else if element.contains("ms") {
-        let value = element.split_whitespace().nth(4).unwrap_or_default();
-        value.trim_end_matches("ms").parse::<f32>().unwrap_or_default()
-    } else if element.contains("us") {
-        let value = element.split_whitespace().nth(4).unwrap_or_default();
-        value.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
+    // Find the part of the string that contains the latency value
+    let latency_part = element
+        .split_whitespace()
+        .find(|s| s.contains("ms") || s.contains("us"))
+        .unwrap_or_default();
+
+    // Extract milliseconds and microseconds
+    if latency_part.contains("ms") && latency_part.contains("us") {
+        // Split into ms and us parts
+        let (ms, us) = latency_part.split_at(latency_part.find("ms").unwrap_or_default() + 2);
+        let ms_value = ms.trim_end_matches("ms").parse::<f32>().unwrap_or_default();
+        let us_value = us.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0;
+        ms_value + us_value
+    } else if latency_part.contains("ms") {
+        // Only milliseconds
+        latency_part.trim_end_matches("ms").parse::<f32>().unwrap_or_default()
+    } else if latency_part.contains("us") {
+        // Only microseconds
+        latency_part.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
     } else {
+        // No valid latency value found
         0.0
     }
- }
- 
+}
  
 pub fn print_line(content: &str, line: u16) -> io::Result<()> {
     execute!(
