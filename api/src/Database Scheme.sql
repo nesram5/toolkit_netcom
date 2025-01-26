@@ -1,8 +1,8 @@
 INSERT INTO tests (test_name, src_address, dst_address)
 VALUES ('TD test', '0.0.0.0', '8.8.8.8');
 
-INSERT INTO latency_reports (test_id, latency_ms)
-VALUES (1, 12.345);
+INSERT INTO latency_reports (test_id, latency_ms, packet_loss)
+VALUES (1, 12.345, 0);
 
 
 CREATE TABLE tests (
@@ -16,7 +16,8 @@ CREATE TABLE tests (
 CREATE TABLE latency_reports (
     report_id INT AUTO_INCREMENT PRIMARY KEY,
     test_id INT NOT NULL,
-    latency_ms DECIMAL(10, 3) NOT NULL,
+    latency_ms DECIMAL(10, 3),
+    packet_loss DECIMAL(10, 3),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (test_id) REFERENCES tests(test_id) ON DELETE CASCADE
 );

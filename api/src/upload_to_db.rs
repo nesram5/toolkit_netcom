@@ -1,14 +1,14 @@
 use std::io::{self, BufRead, Cursor, BufReader};
 use ssh2::Channel;
-use std::process::Command;
+//use std::process::Command;
 use std::error::Error as StdError;
-use std::process;
+//use std::process;
 use std::env;
 use dotenv::dotenv;
 use mysql_async::{Opts, OptsBuilder, Conn, Error};
 use mysql_async::prelude::*;
 use crate::ssh::establish_ssh_connection;
-use crate::auxiliar::parse_latency_value;
+//use crate::auxiliar::{ parse_latency_value, calculate_packet_loss};
 use std::io::Read;
 
 struct MySQLConnection {
@@ -21,15 +21,15 @@ impl MySQLConnection {
         Ok(MySQLConnection { conn })
     }
 
-    pub async fn insert_latency_data(&mut self, test_id: i32, latency_ms: f32) -> Result<(), Error> {
-        let query = "INSERT INTO latency_reports (test_id, latency_ms) VALUES (?, ?)";
-        self.conn.exec_drop(query, (test_id, latency_ms)).await?;
+    pub async fn insert_latency_data(&mut self, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>) -> Result<(), Error> {
+        let query = "INSERT INTO latency_reports (test_id, latency_ms, packet_loss) VALUES (?, ?, ?)";
+        self.conn.exec_drop(query, (test_id, latency_ms, packet_loss)).await?;
         Ok(())
     }
 }
 
-async fn upload_to_db(conn: &mut MySQLConnection, test_id: i32, latency_ms: &f32) -> Result<(), Error> {
-    conn.insert_latency_data(test_id, *latency_ms).await?;
+async fn upload_to_db(conn: &mut MySQLConnection, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>) -> Result<(), Error> {
+    conn.insert_latency_data(test_id, latency_ms, packet_loss).await?;
     Ok(())
 }
 
@@ -73,9 +73,9 @@ pub async fn upload_mode(test_id: i32, username: &str, password: &str, address: 
     Ok(())
 }
 
-fn process_ssh_terminal(buffer: &mut [u8; 4096], address: String, title: String) -> (Vec<f32>, Vec<i32>) {
+fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<Option<f32>>, Vec<i32>) {
     let mut ttl: Vec<i32> = Vec::new();
-    let mut latency: Vec<f32> = Vec::new();
+    let mut latency: Vec<Option<f32>> = Vec::new();
     let mut reader = BufReader::new(Cursor::new(&buffer[..]));
 
     loop {
@@ -95,18 +95,13 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096], address: String, title: String)
             continue;
         } else if line.trim().ends_with(&['m', 's', 'u', 's'][..]) {
             let combined_value = parse_latency_value(&line);
-            latency.push(combined_value);
+            latency.push(Some(combined_value));
 
             if line.len() >= 5 {
                 ttl.push(line.split_whitespace().nth(3).unwrap_or("0").parse().unwrap_or(0));
             }
         } else if line.contains("could not...") || line.contains("packet-loss=100%") || line.contains("timeout") {
-            latency.push(9999.0);
-            println!("{}", line);
-        } else if line.contains("Invalid ar...") {
-            println!("\t\tInvalid command, check if the interface or IP is in use on router {} \n\t\tTest name: {}", address, title);
-            let _ = Command::new("cmd.exe").arg("/c").arg("pause").status();
-            process::exit(0);
+            latency.push(None);
         }
 
         if !latency.is_empty() {
@@ -116,8 +111,8 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096], address: String, title: String)
     (latency, ttl)
 }
 
-async fn ping_test_continous_output(test_id: i32, mut channel: Channel, title: String, address: String, command: String) -> Result<(), Box<dyn StdError>> {
-    let mut latency: Vec<f32> = Vec::new();
+async fn ping_test_continous_output(test_id: i32, mut channel: Channel, _title: String, _address: String, command: String) -> Result<(), Box<dyn StdError>> {
+    let mut latency: Vec<Option<f32>> = Vec::new();
     channel.exec(&command)?;
 
     let mut conn = connect_to_db().await?;
@@ -129,21 +124,56 @@ async fn ping_test_continous_output(test_id: i32, mut channel: Channel, title: S
             break;
         }
 
-        let (latency_result, _ttl_result) = process_ssh_terminal(&mut buffer, address.to_string(), title.to_string());
+        let (latency_result, _ttl_result) = process_ssh_terminal(&mut buffer);
         latency.extend(latency_result);
-
-        if let Some(last_latency) = latency.last() {
-            if *last_latency != 0.0 {
-                upload_to_db(&mut conn, test_id, last_latency).await?;
-            }
-        }
+        let packet_loss = calculate_packet_loss(&latency);
+        let last_latency = latency.last().cloned().flatten();
+        upload_to_db(&mut conn, test_id, last_latency, packet_loss).await?;
+        
 
         buffer = [0; 4096];
 
-        if latency.len() == 100 {
+        if latency.len() == 20 {
             latency.remove(0);
         }
     }
 
     Ok(())
+}
+
+pub fn calculate_packet_loss(latencies: &Vec<Option<f32>>) -> Option<f32> {
+    let total_packets = latencies.len() as f32;
+    let lost_packets = latencies.iter().filter(|&&latency| latency.is_none()).count() as f32;
+
+    if total_packets == 0.0 {
+        return None;
+    }
+
+    if lost_packets == total_packets {
+        return Some(100.0);
+    }
+
+    Some((lost_packets / total_packets) * 100.0)
+}
+
+
+pub fn parse_latency_value(element: &str) -> f32 {
+    let latency_part = element
+        .split_whitespace()
+        .find(|s| s.contains("ms") || s.contains("us"))
+        .unwrap_or_default();
+
+    if latency_part.contains("ms") && latency_part.contains("us") {
+        let (ms, us) = latency_part.split_at(latency_part.find("ms").unwrap_or_default() + 2);
+        let ms_value = ms.trim_end_matches("ms").parse::<f32>().unwrap_or_default();
+        let us_value = us.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0;
+        ms_value + us_value
+    } else if latency_part.contains("ms") {
+        latency_part.trim_end_matches("ms").parse::<f32>().unwrap_or_default()
+    } else if latency_part.contains("us") {
+        latency_part.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
+    } else {
+        println!("{:?}", element);
+        0.0
+    }
 }

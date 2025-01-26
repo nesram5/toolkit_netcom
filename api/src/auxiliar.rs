@@ -6,21 +6,26 @@ use std::path::PathBuf;
 use std::env;
 
 pub fn calculate_packet_loss(latencies: &Vec<f32>) -> f32 {
-    // Count the number of latencies equal to or less than the threshold
-    let lost_packets = latencies.iter().filter(|&&latency| latency == 9999.0).count() as f32;
-    
-    let total_packets = latencies.len() as f32;
-    let mut _packet_loss_percentage:f32;
-    if lost_packets == total_packets{
-        _packet_loss_percentage = 100.0;
-        return _packet_loss_percentage;
-    }
-    // Calculate the packet-loss percentage
-    let total_packets = latencies.len() as f32;
-    let _packet_loss_percentage = (lost_packets * 100.00) / total_packets;
+    // Filter out NaN values
+    let valid_latencies: Vec<f32> = latencies.iter().cloned().filter(|&x| !x.is_nan()).collect();
 
-    _packet_loss_percentage
+    if valid_latencies.is_empty() {
+        return 0.0; // Return 0% if there are no valid latencies
+    }
+
+    // Count the number of lost packets (latency == 9999.0)
+    let lost_packets = valid_latencies.iter().filter(|&&latency| latency == 9999.0).count() as f32;
+    
+    let total_packets = valid_latencies.len() as f32;
+
+    // Calculate the packet-loss percentage
+    if lost_packets == total_packets {
+        return 100.0;
+    }
+
+    (lost_packets * 100.0) / total_packets
 }
+
 
 pub fn calculate_average_latency(latencies: &Vec<f32>) -> f32 {
     // Check if the vector is empty
@@ -98,7 +103,7 @@ pub fn parse_latency_value(element: &str) -> f32 {
         latency_part.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
     } else {
         // No valid latency value found
-        0.0
+        f32::NAN
     }
 }
  

@@ -10,5 +10,5 @@ Copyright (C) Microsoft Corporation.  All rights reserved.
 RC Error:
 
 ------
-cargo:rustc-link-search=native=D:\testing\toolkit_netcom\toolkit\target\debug\build\toolkit-6981a7a6f0ab161d\out
+cargo:rustc-link-search=native=d:\testing\toolkit_netcom\toolkit\target\debug\build\toolkit-6981a7a6f0ab161d\out
 cargo:rustc-link-lib=dylib=resource
