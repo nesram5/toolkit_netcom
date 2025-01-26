@@ -1,2 +1,2 @@
-api/target
-toolkit/target
+api/target/*
+toolkit/target/*
