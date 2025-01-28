@@ -21,15 +21,15 @@ impl MySQLConnection {
         Ok(MySQLConnection { conn })
     }
 
-    pub async fn insert_latency_data(&mut self, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>) -> Result<(), Error> {
-        let query = "INSERT INTO latency_reports (test_id, latency_ms, packet_loss) VALUES (?, ?, ?)";
-        self.conn.exec_drop(query, (test_id, latency_ms, packet_loss)).await?;
+    pub async fn insert_latency_data(&mut self, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>, ttl: Option<i32>) -> Result<(), Error> {
+        let query = "INSERT INTO latency_reports (test_id, latency_ms, packet_loss, ttl) VALUES (?, ?, ?, ?)";
+        self.conn.exec_drop(query, (test_id, latency_ms, packet_loss, ttl)).await?;
         Ok(())
     }
 }
 
-async fn upload_to_db(conn: &mut MySQLConnection, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>) -> Result<(), Error> {
-    conn.insert_latency_data(test_id, latency_ms, packet_loss).await?;
+async fn upload_to_db(conn: &mut MySQLConnection, test_id: i32, latency_ms: Option<f32>, packet_loss: Option<f32>, ttl: Option<i32>) -> Result<(), Error> {
+    conn.insert_latency_data(test_id, latency_ms, packet_loss, ttl).await?;
     Ok(())
 }
 
@@ -73,8 +73,8 @@ pub async fn upload_mode(test_id: i32, username: &str, password: &str, address: 
     Ok(())
 }
 
-fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<Option<f32>>, Vec<i32>) {
-    let mut ttl: Vec<i32> = Vec::new();
+fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<Option<f32>>, Vec<Option<i32>>) {
+    let mut ttl: Vec<Option<i32>> = Vec::new();
     let mut latency: Vec<Option<f32>> = Vec::new();
     let mut reader = BufReader::new(Cursor::new(&buffer[..]));
 
@@ -90,15 +90,29 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<Option<f32>>, Vec<i32>)
         }
 
         if line.contains("SEQ HOST") {
-            continue;
-        } else if line.contains("avg-rtt=") && line.contains("packet-loss=") {
-            continue;
+            let mut _1 : Vec<Option<f32>> = Vec::new();
+            let mut _2 : Vec<Option<i32>> = Vec::new();
+            _1.push(None);
+            _2.push(None); 
+            return (_1, _2);//Pass none to avoid submit duplicated values
+            //continue;
+        } else if line.contains("sent=") || line.contains("received=") || line.contains("avg-rtt=") || line.contains("max-rtt=") {
+       
+            let mut _1 : Vec<Option<f32>> = Vec::new();
+            let mut _2 : Vec<Option<i32>> = Vec::new();
+            _1.push(None);
+            _2.push(None);
+            return (_1, _2); //Pass none to avoid submit duplicated values
+            //continue;
         } else if line.trim().ends_with(&['m', 's', 'u', 's'][..]) {
             let combined_value = parse_latency_value(&line);
+            if combined_value == 5555.0 {
+                continue; //ramdom value to avoid false 0 values.
+            }
             latency.push(Some(combined_value));
 
             if line.len() >= 5 {
-                ttl.push(line.split_whitespace().nth(3).unwrap_or("0").parse().unwrap_or(0));
+                ttl.push(Some(line.split_whitespace().nth(3).unwrap_or("0").parse().unwrap_or(0)));
             }
         } else if line.contains("could not...") || line.contains("packet-loss=100%") || line.contains("timeout") {
             latency.push(None);
@@ -113,6 +127,7 @@ fn process_ssh_terminal(buffer: &mut [u8; 4096]) -> (Vec<Option<f32>>, Vec<i32>)
 
 async fn ping_test_continous_output(test_id: i32, mut channel: Channel, _title: String, _address: String, command: String) -> Result<(), Box<dyn StdError>> {
     let mut latency: Vec<Option<f32>> = Vec::new();
+    let mut ttl: Vec<Option<i32>> = Vec::new();
     channel.exec(&command)?;
 
     let mut conn = connect_to_db().await?;
@@ -124,17 +139,25 @@ async fn ping_test_continous_output(test_id: i32, mut channel: Channel, _title: 
             break;
         }
 
-        let (latency_result, _ttl_result) = process_ssh_terminal(&mut buffer);
+        let (latency_result, ttl_result) = process_ssh_terminal(&mut buffer);
+        if latency_result.last().cloned().flatten() == None {
+            continue; //Pass none to avoid submit duplicated values
+        }
         latency.extend(latency_result);
-        let packet_loss = calculate_packet_loss(&latency);
-        let last_latency = latency.last().cloned().flatten();
-        upload_to_db(&mut conn, test_id, last_latency, packet_loss).await?;
+        ttl.extend(ttl_result);
+
+        if latency.len() == 20 {
+            let packet_loss = calculate_packet_loss(&latency);
+            let average_latency = calculate_average(&latency);
+            let average_ttl = calculate_average_ttl(&ttl);
+            //println!("last_latency: {:?}, packet_loss: {:?}, average_ttl: {:?}", average_latency, packet_loss, average_ttl);
+            upload_to_db(&mut conn, test_id, average_latency, packet_loss, average_ttl).await?;
         
 
         buffer = [0; 4096];
 
-        if latency.len() == 20 {
-            latency.remove(0);
+        
+            latency.clear();
         }
     }
 
@@ -174,6 +197,51 @@ pub fn parse_latency_value(element: &str) -> f32 {
         latency_part.trim_end_matches("us").parse::<f32>().unwrap_or_default() / 1000.0
     } else {
         println!("{:?}", element);
-        0.0
+        5555.0 //ramdom value to avoid error
+    }
+}
+
+
+fn calculate_average(values: &Vec<Option<f32>>) -> Option<f32> {
+    let mut sum = 0.0;
+    let mut count = 0;
+
+    for value in values {
+        match value {
+            Some(v) => {
+                sum += v;
+                count += 1;
+            }
+            None => {
+                continue;
+            }
+        }
+    }
+
+    if count == 0 {
+        None // If all values are None, return None
+    } else {
+        Some(sum / count as f32) // Return the average as Some(f32)
+    }
+}fn calculate_average_ttl(values: &Vec<Option<i32>>) -> Option<i32> {
+    let mut sum = 0;
+    let mut count = 0;
+
+    for value in values {
+        match value {
+            Some(v) => {
+                sum += v;
+                count += 1;
+            }
+            None => {
+                continue;
+            }
+        }
+    }
+
+    if count == 0 {
+        None // If all values are None, return None
+    } else {
+        Some(sum / count) // Return the truncated average as Some(i32)
     }
 }
